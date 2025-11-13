@@ -56,7 +56,7 @@ pub fn glob_match(glob: &str, path: &str, flags: u8) -> bool {
 }
 
 #[allow(dead_code)] // TODO: figure out if we want capture support
-pub fn glob_match_with_captures<'a>(glob: &str, path: &'a str) -> Option<Vec<Capture>> {
+pub fn glob_match_with_captures(glob: &str, path: &str) -> Option<Vec<Capture>> {
     let mut captures = Vec::new();
     if glob_match_internal(glob, path, Some(&mut captures), flags::DEFAULT) {
         return Some(captures);
@@ -64,9 +64,9 @@ pub fn glob_match_with_captures<'a>(glob: &str, path: &'a str) -> Option<Vec<Cap
     None
 }
 
-fn glob_match_internal<'a>(
+fn glob_match_internal(
     glob: &str,
-    path: &'a str,
+    path: &str,
     mut captures: Option<&mut Vec<Capture>>,
     flags: u8,
 ) -> bool {
@@ -175,11 +175,10 @@ fn glob_match_internal<'a>(
                     if brace_stack.length > 0
                         && state.glob_index < glob.len()
                         && matches!(glob[state.glob_index], b',' | b'}')
+                        && state.skip_braces(glob, &mut captures, false) == BraceState::Invalid
                     {
-                        if state.skip_braces(glob, &mut captures, false) == BraceState::Invalid {
-                            // invalid pattern!
-                            return false;
-                        }
+                        // invalid pattern!
+                        return false;
                     }
 
                     continue;
@@ -469,11 +468,12 @@ impl State {
                         }
                         capture_index += 1;
                     }
-                    if c == b'*' {
-                        if self.glob_index + 1 < glob.len() && glob[self.glob_index + 1] == b'*' {
-                            self.glob_index = skip_globstars(glob, self.glob_index + 2) - 2;
-                            self.glob_index += 1;
-                        }
+                    if c == b'*'
+                        && self.glob_index + 1 < glob.len()
+                        && glob[self.glob_index + 1] == b'*'
+                    {
+                        self.glob_index = skip_globstars(glob, self.glob_index + 2) - 2;
+                        self.glob_index += 1;
                     }
                 }
                 b']' => in_brackets = false,
