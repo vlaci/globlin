@@ -56,6 +56,7 @@ jobs:
         if: ${{ matrix.arch == 'x86_64-linux' }}
         run: |
           nix build .#checks.${{ matrix.arch }}.test-coverage -o cargo-test
+          nix build .#checks.${{ matrix.arch }}.pytest-coverage -o pytest
       - uses: codecov/codecov-action@v5
         if: ${{ matrix.arch == 'x86_64-linux' }}
         with:
