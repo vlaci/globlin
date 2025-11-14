@@ -6,8 +6,6 @@ SPDX-License-Identifier: EUPL-1.2
 
 # globlin
 
-**NOTE**: The project is renamed to [`globlin`](https://pypi.org/project/globlin). This package is no longer updated.
-
 This package provides a faster and more featureful `fnmatch` implementation over the one built into Python's standard library. 
 
 The implementation is provided by the [`glob-match`](https://crates.io/crates/glob-match) library.
