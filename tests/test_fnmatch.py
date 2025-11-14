@@ -2,8 +2,9 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-import better_fnmatch
 import pytest
+
+import globlin
 
 
 @pytest.mark.parametrize(
@@ -23,5 +24,5 @@ import pytest
         ("foo?", "fooba", False),
     ],
 )
-def test_better_fnmatch(pattern: str, value: str, match: bool):
-    assert better_fnmatch.fnmatch(pattern, value) is match
+def test_globlin(pattern: str, value: str, match: bool):
+    assert globlin.fnmatch(pattern, value) is match

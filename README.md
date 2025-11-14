@@ -4,7 +4,7 @@ SPDX-FileCopyrightText: 2025 2025 László Vaskó <opensource@vlaci.email.com>
 SPDX-License-Identifier: EUPL-1.2
 -->
 
-# better-fnmatch
+# globlin
 
 **NOTE**: The project is renamed to [`globlin`](https://pypi.org/project/globlin). This package is no longer updated.
 

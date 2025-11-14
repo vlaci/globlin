@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: EUPL-1.2
 
 [project]
-name = "better-fnmatch"
+name = "globlin"
 requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Rust",
@@ -16,9 +16,9 @@ readme = "README.md"
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://vlaci.github.io/better-fnmatch"
-Repository = "https://github.com/vlaci/better-fnmatch"
-Changelog = "https://github.com/vlaci/better-fnmatch/blob/main/CHANGELOG.md"
+Homepage = "https://vlaci.github.io/globlin"
+Repository = "https://github.com/vlaci/globlin"
+Changelog = "https://github.com/vlaci/globlin/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = ["maturin-import-hook==0.3.0", "ruff==0.14.4"]
@@ -87,7 +87,7 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.isort]
-known-first-party = ["better-fnmatch"]
+known-first-party = ["globlin"]
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = false

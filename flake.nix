@@ -99,7 +99,7 @@
         {
           pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
             (_python-final: _python-prev: {
-              better-fnmatch = cmLib.buildMaturinPackage {
+              globlin = cmLib.buildMaturinPackage {
                 src = final.lib.cleanSourceWith {
                   src = cmLib.path ./.;
                   filter = sourceFilter;
@@ -116,19 +116,19 @@
       checks = forAllSystems (
         system:
         let
-          inherit (nixpkgsFor.${system}.python3Packages) better-fnmatch;
+          inherit (nixpkgsFor.${system}.python3Packages) globlin;
         in
-        better-fnmatch.passthru.tests
+        globlin.passthru.tests
       );
 
       packages = forAllSystems (
         system:
         let
-          inherit (nixpkgsFor.${system}.python3Packages) better-fnmatch;
+          inherit (nixpkgsFor.${system}.python3Packages) globlin;
         in
         {
-          inherit better-fnmatch;
-          default = better-fnmatch;
+          inherit globlin;
+          default = globlin;
         }
       );
 

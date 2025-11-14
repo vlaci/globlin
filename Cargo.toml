@@ -3,13 +3,13 @@
 # SPDX-License-Identifier: EUPL-1.2
 
 [package]
-name = "better-fnmatch"
+name = "globlin"
 version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "better_fnmatch"
+name = "globlin"
 crate-type = ["cdylib"]
 
 [dependencies]

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 #[pyo3::pymodule]
-mod better_fnmatch {
+mod globlin {
     use glob_match::glob_match;
     use pyo3::prelude::*;
     #[pyfunction]

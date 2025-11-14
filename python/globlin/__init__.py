@@ -3,4 +3,4 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-from .better_fnmatch import fnmatch as fnmatch
+from .globlin import fnmatch as fnmatch

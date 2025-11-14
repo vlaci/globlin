@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [[package]]
-name = "better-fnmatch"
+name = "globlin"
 source = { editable = "." }
 
 [package.dev-dependencies]
