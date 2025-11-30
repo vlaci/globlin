@@ -10,10 +10,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "globlin"
-version = "0.2.0"
-dependencies = [
- "pyo3",
-]
+version = "0.2.1"
 
 [[package]]
 name = "heck"
@@ -125,6 +122,14 @@ dependencies = [
  "pyo3-build-config",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "python_binding"
+version = "0.2.1"
+dependencies = [
+ "globlin",
+ "pyo3",
 ]
 
 [[package]]

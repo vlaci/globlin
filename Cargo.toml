@@ -2,15 +2,22 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-[package]
-name = "globlin"
-version = "0.2.0"
+[workspace]
+resolver = "2"
+members = [
+ "crates/globlin",
+ "crates/python_binding",
+]
+default-members = ["crates/globlin"]
+
+[workspace.package]
 edition = "2021"
+version = "0.2.1"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-name = "globlin"
-crate-type = ["cdylib"]
+[workspace.dependencies]
+globlin = { path = "crates/globlin" }
 
-[dependencies]
 pyo3 = "0.27.1"
+
+[profile.release]
+debug = true
