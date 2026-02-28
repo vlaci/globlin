@@ -29,9 +29,9 @@ jobs:
             arch: x86_64-linux
           - os: ubuntu-24.04-arm
             arch: aarch64-linux
-          - os: macos-13
+          - os: macos-26-intel
             arch: x86_64-darwin
-          - os: macos-14
+          - os: macos-26
             arch: aarch64-darwin
     name: Build Nix - ${{ matrix.arch }}.${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -277,9 +277,9 @@ jobs:
     strategy:
       matrix:
         platform:
-          - runner: macos-13
+          - runner: macos-26-intel
             target: x86_64
-          - runner: macos-14
+          - runner: macos-26
             target: aarch64
     steps:
       - uses: actions/checkout@v5
