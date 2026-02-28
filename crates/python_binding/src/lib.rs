@@ -31,7 +31,7 @@ mod globlin {
 
     #[allow(non_camel_case_types)]
     #[allow(clippy::upper_case_acronyms)]
-    #[pyclass(eq)]
+    #[pyclass(eq, from_py_object)]
     #[derive(Clone, PartialEq)]
     enum Flag {
         EMPTY,
