@@ -7,7 +7,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     advisory-db = {
       url = "github:rustsec/advisory-db";
       flake = false;
@@ -33,6 +36,7 @@
       advisory-db,
       git-hooks,
       shell-hooks,
+      rust-overlay,
       ...
     }:
     let
@@ -49,6 +53,7 @@
           inherit system;
           overlays = [
             self.overlays.default
+            rust-overlay.overlays.default
             shell-hooks.overlays.default
           ];
         }
@@ -145,17 +150,28 @@
               with pkgs;
               [
                 cargo-msrv
-                cargo
-                clippy
-                rust-analyzer
-                rustc
-                rustfmt
+                cargo-fuzz
+                cargo-flamegraph
+                (rust-bin.selectLatestNightlyWith (
+                  toolchain:
+                  toolchain.default.override {
+                    extensions = [
+                      "cargo"
+                      "clippy"
+                      "miri"
+                      "rust-src"
+                      "rustc"
+                      "rustfmt"
+                    ];
+                  }
+                ))
                 uv
                 python3Packages.uvVenvShellHook
                 python3Packages.maturinImportShellHook
                 python3Packages.autoPatchelfVenvShellHook
               ]
-              ++ pre-commit-check.${system}.enabledPackages;
+              ++ pre-commit-check.${system}.enabledPackages
+              ++ lib.optional stdenv.hostPlatform.isLinux perf;
             env.UV_LINK_MODE = "copy";
             uvExtraArgs = [
               "--group"

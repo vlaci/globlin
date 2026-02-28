@@ -6,3 +6,10 @@
 name = "globlin"
 edition.workspace = true
 version.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "fnmatch"
+harness = false
