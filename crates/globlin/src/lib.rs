@@ -334,6 +334,8 @@ pub fn glob_match_internal(
                 BraceState::Invalid => return false,
                 BraceState::Comma => {
                     state.path_index = brace_stack.last().path_index;
+                    state.wildcard = Wildcard::default();
+                    state.globstar = Wildcard::default();
                     continue;
                 }
                 BraceState::EndBrace => {}
@@ -2625,5 +2627,8 @@ mod tests {
         assert!(!glob_match(s, s, flags::DEFAULT));
         let s = "**** *{*{??*{??***\u{5} *{*{??*{??***\u{5},\0U\0}]*****\u{1},\0***\0,\0\0}w****,\0U\0}]*****\u{1},\0***\0,\0\0}w*****\u{1}***{}*.*\0\0*\0";
         assert!(!glob_match(s, s, flags::DEFAULT));
+
+        // Stale globstar backtrack across brace alternatives caused infinite loop.
+        assert!(!glob_match("{/**/0,*", "/1", flags::DEFAULT));
     }
 }
