@@ -20,3 +20,10 @@ __pycache__/
 # Unit test / coverage reports
 htmlcov/
 .coverage
+
+# Profiling / fuzzing artifacts
+flamegraph.svg
+perf.data
+perf.data.old
+fuzz-*.log
+result

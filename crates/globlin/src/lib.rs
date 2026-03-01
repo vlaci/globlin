@@ -52,27 +52,30 @@ macro_rules! flag_unset {
 type Capture = Range<usize>;
 
 pub fn glob_match(glob: &str, path: &str, flags: u8) -> bool {
-    glob_match_internal(glob, path, None, flags)
+    glob_match_internal(glob.as_bytes(), path.as_bytes(), None, flags)
 }
 
 #[allow(dead_code)] // TODO: figure out if we want capture support
 pub fn glob_match_with_captures(glob: &str, path: &str) -> Option<Vec<Capture>> {
     let mut captures = Vec::new();
-    if glob_match_internal(glob, path, Some(&mut captures), flags::DEFAULT) {
+    if glob_match_internal(
+        glob.as_bytes(),
+        path.as_bytes(),
+        Some(&mut captures),
+        flags::DEFAULT,
+    ) {
         return Some(captures);
     }
     None
 }
 
-fn glob_match_internal(
-    glob: &str,
-    path: &str,
+pub fn glob_match_internal(
+    glob: &[u8],
+    path: &[u8],
     mut captures: Option<&mut Vec<Capture>>,
     flags: u8,
 ) -> bool {
     // This algorithm is based on https://research.swtch.com/glob
-    let glob = glob.as_bytes();
-    let path = path.as_bytes();
 
     let glob_star_enabled = flag_set!(flags, flags::GLOB_STAR);
     let bracket_expansion_enabled = flag_set!(flags, flags::BRACKET_EXPANSION);
@@ -331,6 +334,8 @@ fn glob_match_internal(
                 BraceState::Invalid => return false,
                 BraceState::Comma => {
                     state.path_index = brace_stack.last().path_index;
+                    state.wildcard = Wildcard::default();
+                    state.globstar = Wildcard::default();
                     continue;
                 }
                 BraceState::EndBrace => {}
@@ -2622,5 +2627,8 @@ mod tests {
         assert!(!glob_match(s, s, flags::DEFAULT));
         let s = "**** *{*{??*{??***\u{5} *{*{??*{??***\u{5},\0U\0}]*****\u{1},\0***\0,\0\0}w****,\0U\0}]*****\u{1},\0***\0,\0\0}w*****\u{1}***{}*.*\0\0*\0";
         assert!(!glob_match(s, s, flags::DEFAULT));
+
+        // Stale globstar backtrack across brace alternatives caused infinite loop.
+        assert!(!glob_match("{/**/0,*", "/1", flags::DEFAULT));
     }
 }

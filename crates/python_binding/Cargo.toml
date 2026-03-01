@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2025 László Vaskó <opensource@vlaci.email.com>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+[package]
+name = "python_binding"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "globlin"
+crate-type = ["cdylib"]
+
+[dependencies]
+globlin.workspace = true
+pyo3.workspace = true
