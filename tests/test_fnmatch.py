@@ -1,6 +1,9 @@
-# SPDX-FileCopyrightText: 2025 László Vaskó <opensource@vlaci.email.com>
+# pyright: reportDeprecated=false
+# SPDX-FileCopyrightText: 2025 László Vaskó <opensource@accounts.vlaci.email>
 #
 # SPDX-License-Identifier: EUPL-1.2
+
+import warnings
 
 import pytest
 
@@ -60,6 +63,7 @@ def test_not_matching_patterns(pattern: str, value: str):
         pytest.param("a?path", "a/path", Flag.NO_PATH, id="no-path-question-mark"),
     ],
 )
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_matching_pattern_with_flags(pattern: str, value: str, flag: Flag):
     assert fnmatch(pattern, value, flag)
 
@@ -81,10 +85,22 @@ def test_matching_pattern_with_flags(pattern: str, value: str, flag: Flag):
         pytest.param("a?path", "a/path", Flag.EMPTY, id="path-question-mark"),
     ],
 )
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_not_matching_pattern_with_flags(pattern: str, value: str, flag: Flag):
     assert not fnmatch(pattern, value, flag)
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_invalid_flags():
     with pytest.raises(TypeError):
         fnmatch("foo", "bar", "not a flag")  # type: ignore
+
+
+def test_old_fnmatch_with_flags_warns():
+    with pytest.deprecated_call():
+        fnmatch("foo*", "foobar", Flag.GLOB_STAR)
+
+
+def test_old_fnmatch_no_flags_no_warning():
+    warnings.simplefilter("error")
+    fnmatch("foo*", "foobar")
