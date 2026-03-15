@@ -12,6 +12,6 @@ struct GlobInput {
 }
 
 fuzz_target!(|data: GlobInput| -> Corpus {
-    let _ = globlin::glob_match(&data.glob, &data.path, globlin::flags::DEFAULT);
+    let _ = globlin::glob_match(&data.glob, &data.path, globlin::flags::ALL);
     Corpus::Keep
 });

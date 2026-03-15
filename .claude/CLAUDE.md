@@ -34,9 +34,12 @@ The entire matching engine lives in `crates/globlin/src/lib.rs`:
 - **State machine:** `State` struct tracks positions in glob/path plus backtrack points (`Wildcard` for `*`, `Wildcard` for `**`)
 - **Wildcard struct** uses `u32` instead of `usize` (measured 10% perf improvement)
 - **BraceStack:** Inline stack (max 10 levels) for nested `{a,b}` expansion — no heap allocation
-- **Feature flags:** `flags` module defines a `u8` bitfield. `DEFAULT` enables all features. Passing any explicit flag disables all others. The `flag_set!`/`flag_unset!` macros do the checking.
+- **Feature flags:** `flags` module defines a `u8` bitfield. `DEFAULT` enables POSIX fnmatch-like features (`BRACKET_EXPANSION | ESCAPE`). `ALL` enables all features (bits 0-5). The `flag_set!` macro checks individual bits.
 
-Python bindings (`crates/python_binding/src/lib.rs`) are thin: a `#[pyfunction] fnmatch` that converts Python `Flag` enum values into the Rust `u8` bitfield, plus a `#[pyclass] Flag` enum.
+Python bindings (`crates/python_binding/src/lib.rs`) provide:
+- `Glob` — primary API. `Glob.default()` starts with POSIX fnmatch-like defaults (bracket expansion + escape). Builder methods (e.g. `.globstar()`, `.no_escape()`) clone and return a new `Glob`. `.match(pattern, value)` performs matching.
+- `flags` submodule — low-level `u8` constants for bitwise composition, used via `Glob.from_flags()`.
+- Deprecated `Flag` enum and `fnmatch` function — backward-compatible, emit `DeprecationWarning`.
 
 ## Key Design Details
 
@@ -46,16 +49,16 @@ Python bindings (`crates/python_binding/src/lib.rs`) are thin: a `#[pyfunction] 
 
 ## Flag System
 
-Flags are a `u8` bitfield in `globlin::flags`. When the Python API receives no flags, it uses `DEFAULT` (all features on). When any flag is passed, only those flags are active.
+Flags are a `u8` bitfield in `globlin::flags`. `DEFAULT` includes only POSIX fnmatch-like features (`BRACKET_EXPANSION | ESCAPE`). `ALL` includes all flags (bits 0-5). The primary Python API is the `Glob` class; the raw bitfield is exposed via `globlin.flags` for advanced use.
 
 | Flag | Bit | Controls |
 |---|---|---|
-| `GLOB_STAR` | 0 | `**` globstar matching |
+| `GLOB_STAR` | 0 | `**` globstar matching (requires `PATH_SEPARATOR`) |
 | `BRACKET_EXPANSION` | 1 | `[abc]` / `[a-z]` ranges |
 | `BRACE_EXPANSION` | 2 | `{a,b,c}` alternatives |
 | `NEGATE` | 3 | `!pattern` negation |
 | `ESCAPE` | 4 | `\` escape sequences |
-| `NO_PATH` | 5 | Allow `*` and `?` to match `/` |
+| `PATH_SEPARATOR` | 5 | Treat `/` as path separator (`*` and `?` do not match `/`) |
 
 ## Build Commands
 
@@ -79,7 +82,7 @@ Flags are a `u8` bitfield in `globlin::flags`. When the Python API receives no f
 ## Testing Conventions
 
 - **Rust tests** are inline in `lib.rs` under `#[cfg(test)] mod tests`. They cover pattern matching, bracket/brace expansion, globstar, negation, escapes, captures, and fuzz-discovered edge cases.
-- **Python tests** in `tests/test_fnmatch.py` use `pytest.mark.parametrize` extensively, testing both matching and non-matching cases for each flag.
+- **Python tests** in `tests/` (`test_fnmatch.py`, `test_glob.py`, `test_flags.py`) use `pytest.mark.parametrize` extensively, testing both matching and non-matching cases for each flag/feature.
 
 ## Commit Conventions
 

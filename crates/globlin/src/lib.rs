@@ -34,8 +34,9 @@ pub mod flags {
     pub const BRACE_EXPANSION: u8 = 1 << 2;
     pub const NEGATE: u8 = 1 << 3;
     pub const ESCAPE: u8 = 1 << 4;
-    pub const DEFAULT: u8 = (1 << 5) - 1;
-    pub const NO_PATH: u8 = 1 << 5;
+    pub const PATH_SEPARATOR: u8 = 1 << 5;
+    pub const ALL: u8 = (1 << 6) - 1;
+    pub const DEFAULT: u8 = BRACKET_EXPANSION | ESCAPE;
 }
 
 macro_rules! flag_set {
@@ -43,12 +44,6 @@ macro_rules! flag_set {
         ($flags & $check) != 0
     };
 }
-macro_rules! flag_unset {
-    ($flags:ident, $check:expr) => {
-        ($flags & $check) == 0
-    };
-}
-
 type Capture = Range<usize>;
 
 pub fn glob_match(glob: &str, path: &str, flags: u8) -> bool {
@@ -62,7 +57,7 @@ pub fn glob_match_with_captures(glob: &str, path: &str) -> Option<Vec<Capture>> 
         glob.as_bytes(),
         path.as_bytes(),
         Some(&mut captures),
-        flags::DEFAULT,
+        flags::ALL,
     ) {
         return Some(captures);
     }
@@ -82,7 +77,7 @@ pub fn glob_match_internal(
     let brace_expansion_enabled = flag_set!(flags, flags::BRACE_EXPANSION);
     let escaping_enabled = flag_set!(flags, flags::ESCAPE);
     let negating_enabled = flag_set!(flags, flags::NEGATE);
-    let path_separator_enabled = flag_unset!(flags, flags::NO_PATH);
+    let path_separator_enabled = flag_set!(flags, flags::PATH_SEPARATOR);
 
     let mut state = State::default();
 
@@ -575,155 +570,143 @@ mod tests {
 
     #[test]
     fn basic() {
-        assert!(glob_match("abc", "abc", flags::DEFAULT));
-        assert!(glob_match("*", "abc", flags::DEFAULT));
-        assert!(glob_match("*", "", flags::DEFAULT));
-        assert!(glob_match("**", "", flags::DEFAULT));
-        assert!(glob_match("*c", "abc", flags::DEFAULT));
-        assert!(!glob_match("*b", "abc", flags::DEFAULT));
-        assert!(glob_match("a*", "abc", flags::DEFAULT));
-        assert!(!glob_match("b*", "abc", flags::DEFAULT));
-        assert!(glob_match("a*", "a", flags::DEFAULT));
-        assert!(glob_match("*a", "a", flags::DEFAULT));
-        assert!(glob_match("a*b*c*d*e*", "axbxcxdxe", flags::DEFAULT));
-        assert!(glob_match("a*b*c*d*e*", "axbxcxdxexxx", flags::DEFAULT));
-        assert!(glob_match("a*b?c*x", "abxbbxdbxebxczzx", flags::DEFAULT));
-        assert!(!glob_match("a*b?c*x", "abxbbxdbxebxczzy", flags::DEFAULT));
+        assert!(glob_match("abc", "abc", flags::ALL));
+        assert!(glob_match("*", "abc", flags::ALL));
+        assert!(glob_match("*", "", flags::ALL));
+        assert!(glob_match("**", "", flags::ALL));
+        assert!(glob_match("*c", "abc", flags::ALL));
+        assert!(!glob_match("*b", "abc", flags::ALL));
+        assert!(glob_match("a*", "abc", flags::ALL));
+        assert!(!glob_match("b*", "abc", flags::ALL));
+        assert!(glob_match("a*", "a", flags::ALL));
+        assert!(glob_match("*a", "a", flags::ALL));
+        assert!(glob_match("a*b*c*d*e*", "axbxcxdxe", flags::ALL));
+        assert!(glob_match("a*b*c*d*e*", "axbxcxdxexxx", flags::ALL));
+        assert!(glob_match("a*b?c*x", "abxbbxdbxebxczzx", flags::ALL));
+        assert!(!glob_match("a*b?c*x", "abxbbxdbxebxczzy", flags::ALL));
 
-        assert!(glob_match("a/*/test", "a/foo/test", flags::DEFAULT));
-        assert!(!glob_match("a/*/test", "a/foo/bar/test", flags::DEFAULT));
-        assert!(glob_match("a/**/test", "a/foo/test", flags::DEFAULT));
-        assert!(glob_match("a/**/test", "a/foo/bar/test", flags::DEFAULT));
-        assert!(glob_match("a/**/b/c", "a/foo/bar/b/c", flags::DEFAULT));
-        assert!(glob_match("a\\*b", "a*b", flags::DEFAULT));
-        assert!(!glob_match("a\\*b", "axb", flags::DEFAULT));
+        assert!(glob_match("a/*/test", "a/foo/test", flags::ALL));
+        assert!(!glob_match("a/*/test", "a/foo/bar/test", flags::ALL));
+        assert!(glob_match("a/**/test", "a/foo/test", flags::ALL));
+        assert!(glob_match("a/**/test", "a/foo/bar/test", flags::ALL));
+        assert!(glob_match("a/**/b/c", "a/foo/bar/b/c", flags::ALL));
+        assert!(glob_match("a\\*b", "a*b", flags::ALL));
+        assert!(!glob_match("a\\*b", "axb", flags::ALL));
 
-        assert!(glob_match("[abc]", "a", flags::DEFAULT));
-        assert!(glob_match("[abc]", "b", flags::DEFAULT));
-        assert!(glob_match("[abc]", "c", flags::DEFAULT));
-        assert!(!glob_match("[abc]", "d", flags::DEFAULT));
-        assert!(glob_match("x[abc]x", "xax", flags::DEFAULT));
-        assert!(glob_match("x[abc]x", "xbx", flags::DEFAULT));
-        assert!(glob_match("x[abc]x", "xcx", flags::DEFAULT));
-        assert!(!glob_match("x[abc]x", "xdx", flags::DEFAULT));
-        assert!(!glob_match("x[abc]x", "xay", flags::DEFAULT));
-        assert!(glob_match("[?]", "?", flags::DEFAULT));
-        assert!(!glob_match("[?]", "a", flags::DEFAULT));
-        assert!(glob_match("[*]", "*", flags::DEFAULT));
-        assert!(!glob_match("[*]", "a", flags::DEFAULT));
+        assert!(glob_match("[abc]", "a", flags::ALL));
+        assert!(glob_match("[abc]", "b", flags::ALL));
+        assert!(glob_match("[abc]", "c", flags::ALL));
+        assert!(!glob_match("[abc]", "d", flags::ALL));
+        assert!(glob_match("x[abc]x", "xax", flags::ALL));
+        assert!(glob_match("x[abc]x", "xbx", flags::ALL));
+        assert!(glob_match("x[abc]x", "xcx", flags::ALL));
+        assert!(!glob_match("x[abc]x", "xdx", flags::ALL));
+        assert!(!glob_match("x[abc]x", "xay", flags::ALL));
+        assert!(glob_match("[?]", "?", flags::ALL));
+        assert!(!glob_match("[?]", "a", flags::ALL));
+        assert!(glob_match("[*]", "*", flags::ALL));
+        assert!(!glob_match("[*]", "a", flags::ALL));
 
-        assert!(glob_match("[a-cx]", "a", flags::DEFAULT));
-        assert!(glob_match("[a-cx]", "b", flags::DEFAULT));
-        assert!(glob_match("[a-cx]", "c", flags::DEFAULT));
-        assert!(!glob_match("[a-cx]", "d", flags::DEFAULT));
-        assert!(glob_match("[a-cx]", "x", flags::DEFAULT));
+        assert!(glob_match("[a-cx]", "a", flags::ALL));
+        assert!(glob_match("[a-cx]", "b", flags::ALL));
+        assert!(glob_match("[a-cx]", "c", flags::ALL));
+        assert!(!glob_match("[a-cx]", "d", flags::ALL));
+        assert!(glob_match("[a-cx]", "x", flags::ALL));
 
-        assert!(!glob_match("[^abc]", "a", flags::DEFAULT));
-        assert!(!glob_match("[^abc]", "b", flags::DEFAULT));
-        assert!(!glob_match("[^abc]", "c", flags::DEFAULT));
-        assert!(glob_match("[^abc]", "d", flags::DEFAULT));
-        assert!(!glob_match("[!abc]", "a", flags::DEFAULT));
-        assert!(!glob_match("[!abc]", "b", flags::DEFAULT));
-        assert!(!glob_match("[!abc]", "c", flags::DEFAULT));
-        assert!(glob_match("[!abc]", "d", flags::DEFAULT));
-        assert!(glob_match("[\\!]", "!", flags::DEFAULT));
+        assert!(!glob_match("[^abc]", "a", flags::ALL));
+        assert!(!glob_match("[^abc]", "b", flags::ALL));
+        assert!(!glob_match("[^abc]", "c", flags::ALL));
+        assert!(glob_match("[^abc]", "d", flags::ALL));
+        assert!(!glob_match("[!abc]", "a", flags::ALL));
+        assert!(!glob_match("[!abc]", "b", flags::ALL));
+        assert!(!glob_match("[!abc]", "c", flags::ALL));
+        assert!(glob_match("[!abc]", "d", flags::ALL));
+        assert!(glob_match("[\\!]", "!", flags::ALL));
 
-        assert!(glob_match("a*b*[cy]*d*e*", "axbxcxdxexxx", flags::DEFAULT));
-        assert!(glob_match("a*b*[cy]*d*e*", "axbxyxdxexxx", flags::DEFAULT));
-        assert!(glob_match(
-            "a*b*[cy]*d*e*",
-            "axbxxxyxdxexxx",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("a*b*[cy]*d*e*", "axbxcxdxexxx", flags::ALL));
+        assert!(glob_match("a*b*[cy]*d*e*", "axbxyxdxexxx", flags::ALL));
+        assert!(glob_match("a*b*[cy]*d*e*", "axbxxxyxdxexxx", flags::ALL));
 
-        assert!(glob_match("test.{jpg,png}", "test.jpg", flags::DEFAULT));
-        assert!(glob_match("test.{jpg,png}", "test.png", flags::DEFAULT));
-        assert!(glob_match("test.{j*g,p*g}", "test.jpg", flags::DEFAULT));
-        assert!(glob_match("test.{j*g,p*g}", "test.jpxxxg", flags::DEFAULT));
-        assert!(glob_match("test.{j*g,p*g}", "test.jxg", flags::DEFAULT));
-        assert!(!glob_match("test.{j*g,p*g}", "test.jnt", flags::DEFAULT));
-        assert!(glob_match("test.{j*g,j*c}", "test.jnc", flags::DEFAULT));
-        assert!(glob_match("test.{jpg,p*g}", "test.png", flags::DEFAULT));
-        assert!(glob_match("test.{jpg,p*g}", "test.pxg", flags::DEFAULT));
-        assert!(!glob_match("test.{jpg,p*g}", "test.pnt", flags::DEFAULT));
-        assert!(glob_match("test.{jpeg,png}", "test.jpeg", flags::DEFAULT));
-        assert!(!glob_match("test.{jpeg,png}", "test.jpg", flags::DEFAULT));
-        assert!(glob_match("test.{jpeg,png}", "test.png", flags::DEFAULT));
-        assert!(glob_match("test.{jp\\,g,png}", "test.jp,g", flags::DEFAULT));
-        assert!(!glob_match("test.{jp\\,g,png}", "test.jxg", flags::DEFAULT));
-        assert!(glob_match(
-            "test/{foo,bar}/baz",
-            "test/foo/baz",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "test/{foo,bar}/baz",
-            "test/bar/baz",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("test.{jpg,png}", "test.jpg", flags::ALL));
+        assert!(glob_match("test.{jpg,png}", "test.png", flags::ALL));
+        assert!(glob_match("test.{j*g,p*g}", "test.jpg", flags::ALL));
+        assert!(glob_match("test.{j*g,p*g}", "test.jpxxxg", flags::ALL));
+        assert!(glob_match("test.{j*g,p*g}", "test.jxg", flags::ALL));
+        assert!(!glob_match("test.{j*g,p*g}", "test.jnt", flags::ALL));
+        assert!(glob_match("test.{j*g,j*c}", "test.jnc", flags::ALL));
+        assert!(glob_match("test.{jpg,p*g}", "test.png", flags::ALL));
+        assert!(glob_match("test.{jpg,p*g}", "test.pxg", flags::ALL));
+        assert!(!glob_match("test.{jpg,p*g}", "test.pnt", flags::ALL));
+        assert!(glob_match("test.{jpeg,png}", "test.jpeg", flags::ALL));
+        assert!(!glob_match("test.{jpeg,png}", "test.jpg", flags::ALL));
+        assert!(glob_match("test.{jpeg,png}", "test.png", flags::ALL));
+        assert!(glob_match("test.{jp\\,g,png}", "test.jp,g", flags::ALL));
+        assert!(!glob_match("test.{jp\\,g,png}", "test.jxg", flags::ALL));
+        assert!(glob_match("test/{foo,bar}/baz", "test/foo/baz", flags::ALL));
+        assert!(glob_match("test/{foo,bar}/baz", "test/bar/baz", flags::ALL));
         assert!(!glob_match(
             "test/{foo,bar}/baz",
             "test/baz/baz",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "test/{foo*,bar*}/baz",
             "test/foooooo/baz",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "test/{foo*,bar*}/baz",
             "test/barrrrr/baz",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "test/{*foo,*bar}/baz",
             "test/xxxxfoo/baz",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "test/{*foo,*bar}/baz",
             "test/xxxxbar/baz",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "test/{foo/**,bar}/baz",
             "test/bar/baz",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "test/{foo/**,bar}/baz",
             "test/bar/test/baz",
-            flags::DEFAULT
+            flags::ALL
         ));
 
         assert!(!glob_match(
             "*.txt",
             "some/big/path/to/the/needle.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "some/**/needle.{js,tsx,mdx,ts,jsx,txt}",
             "some/a/bigger/path/to/the/crazy/needle.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "some/**/{a,b,c}/**/needle.txt",
             "some/foo/a/bigger/path/to/the/crazy/needle.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "some/**/{a,b,c}/**/needle.txt",
             "some/foo/d/bigger/path/to/the/crazy/needle.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match("a/{a{a,b},b}", "a/aa", flags::DEFAULT));
-        assert!(glob_match("a/{a{a,b},b}", "a/ab", flags::DEFAULT));
-        assert!(!glob_match("a/{a{a,b},b}", "a/ac", flags::DEFAULT));
-        assert!(glob_match("a/{a{a,b},b}", "a/b", flags::DEFAULT));
-        assert!(!glob_match("a/{a{a,b},b}", "a/c", flags::DEFAULT));
-        assert!(glob_match("a/{b,c[}]*}", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/{b,c[}]*}", "a/c}xx", flags::DEFAULT));
+        assert!(glob_match("a/{a{a,b},b}", "a/aa", flags::ALL));
+        assert!(glob_match("a/{a{a,b},b}", "a/ab", flags::ALL));
+        assert!(!glob_match("a/{a{a,b},b}", "a/ac", flags::ALL));
+        assert!(glob_match("a/{a{a,b},b}", "a/b", flags::ALL));
+        assert!(!glob_match("a/{a{a,b},b}", "a/c", flags::ALL));
+        assert!(glob_match("a/{b,c[}]*}", "a/b", flags::ALL));
+        assert!(glob_match("a/{b,c[}]*}", "a/c}xx", flags::ALL));
     }
 
     #[test]
@@ -731,17 +714,17 @@ mod tests {
         assert!(glob_match(
             "some/**/needle.txt",
             "some/path/needle.txt",
-            flags::DEFAULT ^ flags::GLOB_STAR
+            flags::ALL ^ flags::GLOB_STAR
         ));
         assert!(!glob_match(
             "some/**/needle.txt",
             "some/big/path/to/needle.txt",
-            flags::DEFAULT ^ flags::GLOB_STAR
+            flags::ALL ^ flags::GLOB_STAR
         ));
         assert!(!glob_match(
             "some/b**o/needle.txt",
             "some/big/path/to/needle.txt",
-            flags::DEFAULT ^ flags::GLOB_STAR
+            flags::ALL ^ flags::GLOB_STAR
         ));
     }
 
@@ -750,22 +733,22 @@ mod tests {
         assert!(glob_match(
             "some/*/needle.txt",
             "some/path/needle.txt",
-            flags::DEFAULT | flags::NO_PATH
+            flags::ALL ^ flags::PATH_SEPARATOR
         ));
         assert!(glob_match(
             "some/*/needle.txt",
             "some/big/path/to/needle.txt",
-            flags::DEFAULT | flags::NO_PATH
+            flags::ALL ^ flags::PATH_SEPARATOR
         ));
         assert!(!glob_match(
             "some/small/*/needle.txt",
             "some/big/path/to/needle.txt",
-            flags::DEFAULT | flags::NO_PATH
+            flags::ALL ^ flags::PATH_SEPARATOR
         ));
         assert!(glob_match(
             "some?needle.txt",
             "some/needle.txt",
-            flags::DEFAULT | flags::NO_PATH
+            flags::ALL ^ flags::PATH_SEPARATOR
         ));
     }
 
@@ -774,27 +757,27 @@ mod tests {
         assert!(!glob_match(
             "[ab]",
             "a",
-            flags::DEFAULT ^ flags::BRACKET_EXPANSION
+            flags::ALL ^ flags::BRACKET_EXPANSION
         ));
         assert!(!glob_match(
             "[a-z]",
             "c",
-            flags::DEFAULT ^ flags::BRACKET_EXPANSION
+            flags::ALL ^ flags::BRACKET_EXPANSION
         ));
         assert!(glob_match(
             "[ab]",
             "[ab]",
-            flags::DEFAULT ^ flags::BRACKET_EXPANSION
+            flags::ALL ^ flags::BRACKET_EXPANSION
         ));
         assert!(glob_match(
             "[a-z]",
             "[a-z]",
-            flags::DEFAULT ^ flags::BRACKET_EXPANSION
+            flags::ALL ^ flags::BRACKET_EXPANSION
         ));
         assert!(glob_match(
             "[!?]",
             "[!a]",
-            flags::DEFAULT ^ flags::BRACKET_EXPANSION
+            flags::ALL ^ flags::BRACKET_EXPANSION
         ));
     }
     #[test]
@@ -802,1701 +785,1569 @@ mod tests {
         assert!(!glob_match(
             "{a,b}",
             "a",
-            flags::DEFAULT ^ flags::BRACE_EXPANSION
+            flags::ALL ^ flags::BRACE_EXPANSION
         ));
         assert!(!glob_match(
             "{a,?}",
             "c",
-            flags::DEFAULT ^ flags::BRACE_EXPANSION
+            flags::ALL ^ flags::BRACE_EXPANSION
         ));
         assert!(glob_match(
             "{a,a}",
             "{a,a}",
-            flags::DEFAULT ^ flags::BRACE_EXPANSION
+            flags::ALL ^ flags::BRACE_EXPANSION
         ));
         assert!(glob_match(
             "{a,?}",
             "{a,z}",
-            flags::DEFAULT ^ flags::BRACE_EXPANSION
+            flags::ALL ^ flags::BRACE_EXPANSION
         ));
     }
 
     #[test]
     fn no_escape() {
-        assert!(!glob_match(r"\*", "*", flags::DEFAULT ^ flags::ESCAPE));
+        assert!(!glob_match(r"\*", "*", flags::ALL ^ flags::ESCAPE));
         assert!(glob_match(
             r"\*",
             r"\needle.txt",
-            flags::DEFAULT ^ flags::ESCAPE
+            flags::ALL ^ flags::ESCAPE
         ));
-        assert!(glob_match(r"\?", r"\a", flags::DEFAULT ^ flags::ESCAPE));
-        assert!(glob_match(r"\[ab]", r"\a", flags::DEFAULT ^ flags::ESCAPE));
+        assert!(glob_match(r"\?", r"\a", flags::ALL ^ flags::ESCAPE));
+        assert!(glob_match(r"\[ab]", r"\a", flags::ALL ^ flags::ESCAPE));
     }
     #[test]
     fn no_negate() {
-        assert!(!glob_match("!a", "b", flags::DEFAULT ^ flags::NEGATE));
-        assert!(glob_match("!a", "!a", flags::DEFAULT ^ flags::NEGATE));
-        assert!(glob_match("!?", "!!", flags::DEFAULT ^ flags::NEGATE));
+        assert!(!glob_match("!a", "b", flags::ALL ^ flags::NEGATE));
+        assert!(glob_match("!a", "!a", flags::ALL ^ flags::NEGATE));
+        assert!(glob_match("!?", "!!", flags::ALL ^ flags::NEGATE));
     }
 
     // The below tests are based on Bash and micromatch.
     // https://github.com/micromatch/picomatch/blob/master/test/bash.js
     // Converted using the following find and replace regex:
     // find: assert\(([!])?isMatch\('(.*?)', ['"](.*?)['"]\)\);
-    // replace: assert!($1glob_match("$3", "$2", flags::DEFAULT));
+    // replace: assert!($1glob_match("$3", "$2", flags::ALL));
 
     #[test]
     fn bash() {
-        assert!(!glob_match("a*", "*", flags::DEFAULT));
-        assert!(!glob_match("a*", "**", flags::DEFAULT));
-        assert!(!glob_match("a*", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a*", "a/*", flags::DEFAULT));
-        assert!(!glob_match("a*", "b", flags::DEFAULT));
-        assert!(!glob_match("a*", "bc", flags::DEFAULT));
-        assert!(!glob_match("a*", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a*", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a*", "Beware", flags::DEFAULT));
-        assert!(glob_match("a*", "a", flags::DEFAULT));
-        assert!(glob_match("a*", "ab", flags::DEFAULT));
-        assert!(glob_match("a*", "abc", flags::DEFAULT));
+        assert!(!glob_match("a*", "*", flags::ALL));
+        assert!(!glob_match("a*", "**", flags::ALL));
+        assert!(!glob_match("a*", "\\*", flags::ALL));
+        assert!(!glob_match("a*", "a/*", flags::ALL));
+        assert!(!glob_match("a*", "b", flags::ALL));
+        assert!(!glob_match("a*", "bc", flags::ALL));
+        assert!(!glob_match("a*", "bcd", flags::ALL));
+        assert!(!glob_match("a*", "bdir/", flags::ALL));
+        assert!(!glob_match("a*", "Beware", flags::ALL));
+        assert!(glob_match("a*", "a", flags::ALL));
+        assert!(glob_match("a*", "ab", flags::ALL));
+        assert!(glob_match("a*", "abc", flags::ALL));
 
-        assert!(!glob_match("\\a*", "*", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "**", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "\\*", flags::DEFAULT));
+        assert!(!glob_match("\\a*", "*", flags::ALL));
+        assert!(!glob_match("\\a*", "**", flags::ALL));
+        assert!(!glob_match("\\a*", "\\*", flags::ALL));
 
-        assert!(glob_match("\\a*", "a", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "a/*", flags::DEFAULT));
-        assert!(glob_match("\\a*", "abc", flags::DEFAULT));
-        assert!(glob_match("\\a*", "abd", flags::DEFAULT));
-        assert!(glob_match("\\a*", "abe", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "b", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "bb", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "bcd", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "Beware", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "c", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "ca", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "cb", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "d", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "dd", flags::DEFAULT));
-        assert!(!glob_match("\\a*", "de", flags::DEFAULT));
+        assert!(glob_match("\\a*", "a", flags::ALL));
+        assert!(!glob_match("\\a*", "a/*", flags::ALL));
+        assert!(glob_match("\\a*", "abc", flags::ALL));
+        assert!(glob_match("\\a*", "abd", flags::ALL));
+        assert!(glob_match("\\a*", "abe", flags::ALL));
+        assert!(!glob_match("\\a*", "b", flags::ALL));
+        assert!(!glob_match("\\a*", "bb", flags::ALL));
+        assert!(!glob_match("\\a*", "bcd", flags::ALL));
+        assert!(!glob_match("\\a*", "bdir/", flags::ALL));
+        assert!(!glob_match("\\a*", "Beware", flags::ALL));
+        assert!(!glob_match("\\a*", "c", flags::ALL));
+        assert!(!glob_match("\\a*", "ca", flags::ALL));
+        assert!(!glob_match("\\a*", "cb", flags::ALL));
+        assert!(!glob_match("\\a*", "d", flags::ALL));
+        assert!(!glob_match("\\a*", "dd", flags::ALL));
+        assert!(!glob_match("\\a*", "de", flags::ALL));
     }
 
     #[test]
     fn bash_directories() {
-        assert!(!glob_match("b*/", "*", flags::DEFAULT));
-        assert!(!glob_match("b*/", "**", flags::DEFAULT));
-        assert!(!glob_match("b*/", "\\*", flags::DEFAULT));
-        assert!(!glob_match("b*/", "a", flags::DEFAULT));
-        assert!(!glob_match("b*/", "a/*", flags::DEFAULT));
-        assert!(!glob_match("b*/", "abc", flags::DEFAULT));
-        assert!(!glob_match("b*/", "abd", flags::DEFAULT));
-        assert!(!glob_match("b*/", "abe", flags::DEFAULT));
-        assert!(!glob_match("b*/", "b", flags::DEFAULT));
-        assert!(!glob_match("b*/", "bb", flags::DEFAULT));
-        assert!(!glob_match("b*/", "bcd", flags::DEFAULT));
-        assert!(glob_match("b*/", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("b*/", "Beware", flags::DEFAULT));
-        assert!(!glob_match("b*/", "c", flags::DEFAULT));
-        assert!(!glob_match("b*/", "ca", flags::DEFAULT));
-        assert!(!glob_match("b*/", "cb", flags::DEFAULT));
-        assert!(!glob_match("b*/", "d", flags::DEFAULT));
-        assert!(!glob_match("b*/", "dd", flags::DEFAULT));
-        assert!(!glob_match("b*/", "de", flags::DEFAULT));
+        assert!(!glob_match("b*/", "*", flags::ALL));
+        assert!(!glob_match("b*/", "**", flags::ALL));
+        assert!(!glob_match("b*/", "\\*", flags::ALL));
+        assert!(!glob_match("b*/", "a", flags::ALL));
+        assert!(!glob_match("b*/", "a/*", flags::ALL));
+        assert!(!glob_match("b*/", "abc", flags::ALL));
+        assert!(!glob_match("b*/", "abd", flags::ALL));
+        assert!(!glob_match("b*/", "abe", flags::ALL));
+        assert!(!glob_match("b*/", "b", flags::ALL));
+        assert!(!glob_match("b*/", "bb", flags::ALL));
+        assert!(!glob_match("b*/", "bcd", flags::ALL));
+        assert!(glob_match("b*/", "bdir/", flags::ALL));
+        assert!(!glob_match("b*/", "Beware", flags::ALL));
+        assert!(!glob_match("b*/", "c", flags::ALL));
+        assert!(!glob_match("b*/", "ca", flags::ALL));
+        assert!(!glob_match("b*/", "cb", flags::ALL));
+        assert!(!glob_match("b*/", "d", flags::ALL));
+        assert!(!glob_match("b*/", "dd", flags::ALL));
+        assert!(!glob_match("b*/", "de", flags::ALL));
     }
 
     #[test]
     fn bash_escaping() {
-        assert!(!glob_match("\\^", "*", flags::DEFAULT));
-        assert!(!glob_match("\\^", "**", flags::DEFAULT));
-        assert!(!glob_match("\\^", "\\*", flags::DEFAULT));
-        assert!(!glob_match("\\^", "a", flags::DEFAULT));
-        assert!(!glob_match("\\^", "a/*", flags::DEFAULT));
-        assert!(!glob_match("\\^", "abc", flags::DEFAULT));
-        assert!(!glob_match("\\^", "abd", flags::DEFAULT));
-        assert!(!glob_match("\\^", "abe", flags::DEFAULT));
-        assert!(!glob_match("\\^", "b", flags::DEFAULT));
-        assert!(!glob_match("\\^", "bb", flags::DEFAULT));
-        assert!(!glob_match("\\^", "bcd", flags::DEFAULT));
-        assert!(!glob_match("\\^", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("\\^", "Beware", flags::DEFAULT));
-        assert!(!glob_match("\\^", "c", flags::DEFAULT));
-        assert!(!glob_match("\\^", "ca", flags::DEFAULT));
-        assert!(!glob_match("\\^", "cb", flags::DEFAULT));
-        assert!(!glob_match("\\^", "d", flags::DEFAULT));
-        assert!(!glob_match("\\^", "dd", flags::DEFAULT));
-        assert!(!glob_match("\\^", "de", flags::DEFAULT));
+        assert!(!glob_match("\\^", "*", flags::ALL));
+        assert!(!glob_match("\\^", "**", flags::ALL));
+        assert!(!glob_match("\\^", "\\*", flags::ALL));
+        assert!(!glob_match("\\^", "a", flags::ALL));
+        assert!(!glob_match("\\^", "a/*", flags::ALL));
+        assert!(!glob_match("\\^", "abc", flags::ALL));
+        assert!(!glob_match("\\^", "abd", flags::ALL));
+        assert!(!glob_match("\\^", "abe", flags::ALL));
+        assert!(!glob_match("\\^", "b", flags::ALL));
+        assert!(!glob_match("\\^", "bb", flags::ALL));
+        assert!(!glob_match("\\^", "bcd", flags::ALL));
+        assert!(!glob_match("\\^", "bdir/", flags::ALL));
+        assert!(!glob_match("\\^", "Beware", flags::ALL));
+        assert!(!glob_match("\\^", "c", flags::ALL));
+        assert!(!glob_match("\\^", "ca", flags::ALL));
+        assert!(!glob_match("\\^", "cb", flags::ALL));
+        assert!(!glob_match("\\^", "d", flags::ALL));
+        assert!(!glob_match("\\^", "dd", flags::ALL));
+        assert!(!glob_match("\\^", "de", flags::ALL));
 
-        assert!(glob_match("\\*", "*", flags::DEFAULT));
-        // assert!(glob_match("\\*", "\\*", flags::DEFAULT));
-        assert!(!glob_match("\\*", "**", flags::DEFAULT));
-        assert!(!glob_match("\\*", "a", flags::DEFAULT));
-        assert!(!glob_match("\\*", "a/*", flags::DEFAULT));
-        assert!(!glob_match("\\*", "abc", flags::DEFAULT));
-        assert!(!glob_match("\\*", "abd", flags::DEFAULT));
-        assert!(!glob_match("\\*", "abe", flags::DEFAULT));
-        assert!(!glob_match("\\*", "b", flags::DEFAULT));
-        assert!(!glob_match("\\*", "bb", flags::DEFAULT));
-        assert!(!glob_match("\\*", "bcd", flags::DEFAULT));
-        assert!(!glob_match("\\*", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("\\*", "Beware", flags::DEFAULT));
-        assert!(!glob_match("\\*", "c", flags::DEFAULT));
-        assert!(!glob_match("\\*", "ca", flags::DEFAULT));
-        assert!(!glob_match("\\*", "cb", flags::DEFAULT));
-        assert!(!glob_match("\\*", "d", flags::DEFAULT));
-        assert!(!glob_match("\\*", "dd", flags::DEFAULT));
-        assert!(!glob_match("\\*", "de", flags::DEFAULT));
+        assert!(glob_match("\\*", "*", flags::ALL));
+        // assert!(glob_match("\\*", "\\*", flags::ALL));
+        assert!(!glob_match("\\*", "**", flags::ALL));
+        assert!(!glob_match("\\*", "a", flags::ALL));
+        assert!(!glob_match("\\*", "a/*", flags::ALL));
+        assert!(!glob_match("\\*", "abc", flags::ALL));
+        assert!(!glob_match("\\*", "abd", flags::ALL));
+        assert!(!glob_match("\\*", "abe", flags::ALL));
+        assert!(!glob_match("\\*", "b", flags::ALL));
+        assert!(!glob_match("\\*", "bb", flags::ALL));
+        assert!(!glob_match("\\*", "bcd", flags::ALL));
+        assert!(!glob_match("\\*", "bdir/", flags::ALL));
+        assert!(!glob_match("\\*", "Beware", flags::ALL));
+        assert!(!glob_match("\\*", "c", flags::ALL));
+        assert!(!glob_match("\\*", "ca", flags::ALL));
+        assert!(!glob_match("\\*", "cb", flags::ALL));
+        assert!(!glob_match("\\*", "d", flags::ALL));
+        assert!(!glob_match("\\*", "dd", flags::ALL));
+        assert!(!glob_match("\\*", "de", flags::ALL));
 
-        assert!(!glob_match("a\\*", "*", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "**", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "a", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "a/*", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "abc", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "abd", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "abe", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "b", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "bb", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "c", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "ca", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "cb", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "d", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "dd", flags::DEFAULT));
-        assert!(!glob_match("a\\*", "de", flags::DEFAULT));
+        assert!(!glob_match("a\\*", "*", flags::ALL));
+        assert!(!glob_match("a\\*", "**", flags::ALL));
+        assert!(!glob_match("a\\*", "\\*", flags::ALL));
+        assert!(!glob_match("a\\*", "a", flags::ALL));
+        assert!(!glob_match("a\\*", "a/*", flags::ALL));
+        assert!(!glob_match("a\\*", "abc", flags::ALL));
+        assert!(!glob_match("a\\*", "abd", flags::ALL));
+        assert!(!glob_match("a\\*", "abe", flags::ALL));
+        assert!(!glob_match("a\\*", "b", flags::ALL));
+        assert!(!glob_match("a\\*", "bb", flags::ALL));
+        assert!(!glob_match("a\\*", "bcd", flags::ALL));
+        assert!(!glob_match("a\\*", "bdir/", flags::ALL));
+        assert!(!glob_match("a\\*", "Beware", flags::ALL));
+        assert!(!glob_match("a\\*", "c", flags::ALL));
+        assert!(!glob_match("a\\*", "ca", flags::ALL));
+        assert!(!glob_match("a\\*", "cb", flags::ALL));
+        assert!(!glob_match("a\\*", "d", flags::ALL));
+        assert!(!glob_match("a\\*", "dd", flags::ALL));
+        assert!(!glob_match("a\\*", "de", flags::ALL));
 
-        assert!(glob_match("*q*", "aqa", flags::DEFAULT));
-        assert!(glob_match("*q*", "aaqaa", flags::DEFAULT));
-        assert!(!glob_match("*q*", "*", flags::DEFAULT));
-        assert!(!glob_match("*q*", "**", flags::DEFAULT));
-        assert!(!glob_match("*q*", "\\*", flags::DEFAULT));
-        assert!(!glob_match("*q*", "a", flags::DEFAULT));
-        assert!(!glob_match("*q*", "a/*", flags::DEFAULT));
-        assert!(!glob_match("*q*", "abc", flags::DEFAULT));
-        assert!(!glob_match("*q*", "abd", flags::DEFAULT));
-        assert!(!glob_match("*q*", "abe", flags::DEFAULT));
-        assert!(!glob_match("*q*", "b", flags::DEFAULT));
-        assert!(!glob_match("*q*", "bb", flags::DEFAULT));
-        assert!(!glob_match("*q*", "bcd", flags::DEFAULT));
-        assert!(!glob_match("*q*", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("*q*", "Beware", flags::DEFAULT));
-        assert!(!glob_match("*q*", "c", flags::DEFAULT));
-        assert!(!glob_match("*q*", "ca", flags::DEFAULT));
-        assert!(!glob_match("*q*", "cb", flags::DEFAULT));
-        assert!(!glob_match("*q*", "d", flags::DEFAULT));
-        assert!(!glob_match("*q*", "dd", flags::DEFAULT));
-        assert!(!glob_match("*q*", "de", flags::DEFAULT));
+        assert!(glob_match("*q*", "aqa", flags::ALL));
+        assert!(glob_match("*q*", "aaqaa", flags::ALL));
+        assert!(!glob_match("*q*", "*", flags::ALL));
+        assert!(!glob_match("*q*", "**", flags::ALL));
+        assert!(!glob_match("*q*", "\\*", flags::ALL));
+        assert!(!glob_match("*q*", "a", flags::ALL));
+        assert!(!glob_match("*q*", "a/*", flags::ALL));
+        assert!(!glob_match("*q*", "abc", flags::ALL));
+        assert!(!glob_match("*q*", "abd", flags::ALL));
+        assert!(!glob_match("*q*", "abe", flags::ALL));
+        assert!(!glob_match("*q*", "b", flags::ALL));
+        assert!(!glob_match("*q*", "bb", flags::ALL));
+        assert!(!glob_match("*q*", "bcd", flags::ALL));
+        assert!(!glob_match("*q*", "bdir/", flags::ALL));
+        assert!(!glob_match("*q*", "Beware", flags::ALL));
+        assert!(!glob_match("*q*", "c", flags::ALL));
+        assert!(!glob_match("*q*", "ca", flags::ALL));
+        assert!(!glob_match("*q*", "cb", flags::ALL));
+        assert!(!glob_match("*q*", "d", flags::ALL));
+        assert!(!glob_match("*q*", "dd", flags::ALL));
+        assert!(!glob_match("*q*", "de", flags::ALL));
 
-        assert!(glob_match("\\**", "*", flags::DEFAULT));
-        assert!(glob_match("\\**", "**", flags::DEFAULT));
-        assert!(!glob_match("\\**", "\\*", flags::DEFAULT));
-        assert!(!glob_match("\\**", "a", flags::DEFAULT));
-        assert!(!glob_match("\\**", "a/*", flags::DEFAULT));
-        assert!(!glob_match("\\**", "abc", flags::DEFAULT));
-        assert!(!glob_match("\\**", "abd", flags::DEFAULT));
-        assert!(!glob_match("\\**", "abe", flags::DEFAULT));
-        assert!(!glob_match("\\**", "b", flags::DEFAULT));
-        assert!(!glob_match("\\**", "bb", flags::DEFAULT));
-        assert!(!glob_match("\\**", "bcd", flags::DEFAULT));
-        assert!(!glob_match("\\**", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("\\**", "Beware", flags::DEFAULT));
-        assert!(!glob_match("\\**", "c", flags::DEFAULT));
-        assert!(!glob_match("\\**", "ca", flags::DEFAULT));
-        assert!(!glob_match("\\**", "cb", flags::DEFAULT));
-        assert!(!glob_match("\\**", "d", flags::DEFAULT));
-        assert!(!glob_match("\\**", "dd", flags::DEFAULT));
-        assert!(!glob_match("\\**", "de", flags::DEFAULT));
+        assert!(glob_match("\\**", "*", flags::ALL));
+        assert!(glob_match("\\**", "**", flags::ALL));
+        assert!(!glob_match("\\**", "\\*", flags::ALL));
+        assert!(!glob_match("\\**", "a", flags::ALL));
+        assert!(!glob_match("\\**", "a/*", flags::ALL));
+        assert!(!glob_match("\\**", "abc", flags::ALL));
+        assert!(!glob_match("\\**", "abd", flags::ALL));
+        assert!(!glob_match("\\**", "abe", flags::ALL));
+        assert!(!glob_match("\\**", "b", flags::ALL));
+        assert!(!glob_match("\\**", "bb", flags::ALL));
+        assert!(!glob_match("\\**", "bcd", flags::ALL));
+        assert!(!glob_match("\\**", "bdir/", flags::ALL));
+        assert!(!glob_match("\\**", "Beware", flags::ALL));
+        assert!(!glob_match("\\**", "c", flags::ALL));
+        assert!(!glob_match("\\**", "ca", flags::ALL));
+        assert!(!glob_match("\\**", "cb", flags::ALL));
+        assert!(!glob_match("\\**", "d", flags::ALL));
+        assert!(!glob_match("\\**", "dd", flags::ALL));
+        assert!(!glob_match("\\**", "de", flags::ALL));
     }
 
     #[test]
     fn bash_classes() {
-        assert!(!glob_match("a*[^c]", "*", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "**", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "a", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "a/*", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "abc", flags::DEFAULT));
-        assert!(glob_match("a*[^c]", "abd", flags::DEFAULT));
-        assert!(glob_match("a*[^c]", "abe", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "b", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "bb", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "c", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "ca", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "cb", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "d", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "dd", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "de", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "baz", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "bzz", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "beware", flags::DEFAULT));
-        assert!(!glob_match("a*[^c]", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("a*[^c]", "*", flags::ALL));
+        assert!(!glob_match("a*[^c]", "**", flags::ALL));
+        assert!(!glob_match("a*[^c]", "\\*", flags::ALL));
+        assert!(!glob_match("a*[^c]", "a", flags::ALL));
+        assert!(!glob_match("a*[^c]", "a/*", flags::ALL));
+        assert!(!glob_match("a*[^c]", "abc", flags::ALL));
+        assert!(glob_match("a*[^c]", "abd", flags::ALL));
+        assert!(glob_match("a*[^c]", "abe", flags::ALL));
+        assert!(!glob_match("a*[^c]", "b", flags::ALL));
+        assert!(!glob_match("a*[^c]", "bb", flags::ALL));
+        assert!(!glob_match("a*[^c]", "bcd", flags::ALL));
+        assert!(!glob_match("a*[^c]", "bdir/", flags::ALL));
+        assert!(!glob_match("a*[^c]", "Beware", flags::ALL));
+        assert!(!glob_match("a*[^c]", "c", flags::ALL));
+        assert!(!glob_match("a*[^c]", "ca", flags::ALL));
+        assert!(!glob_match("a*[^c]", "cb", flags::ALL));
+        assert!(!glob_match("a*[^c]", "d", flags::ALL));
+        assert!(!glob_match("a*[^c]", "dd", flags::ALL));
+        assert!(!glob_match("a*[^c]", "de", flags::ALL));
+        assert!(!glob_match("a*[^c]", "baz", flags::ALL));
+        assert!(!glob_match("a*[^c]", "bzz", flags::ALL));
+        assert!(!glob_match("a*[^c]", "BZZ", flags::ALL));
+        assert!(!glob_match("a*[^c]", "beware", flags::ALL));
+        assert!(!glob_match("a*[^c]", "BewAre", flags::ALL));
 
-        assert!(glob_match("a[X-]b", "a-b", flags::DEFAULT));
-        assert!(glob_match("a[X-]b", "aXb", flags::DEFAULT));
+        assert!(glob_match("a[X-]b", "a-b", flags::ALL));
+        assert!(glob_match("a[X-]b", "aXb", flags::ALL));
 
-        assert!(!glob_match("[a-y]*[^c]", "*", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "a*", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "**", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "\\*", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "a", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "a123b", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "a123c", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "ab", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "a/*", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "abc", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "abd", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "abe", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "b", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "bd", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "bb", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "bcd", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "Beware", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "c", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "ca", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "cb", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "d", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "dd", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "dd", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "dd", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "de", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "baz", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "bzz", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "bzz", flags::DEFAULT));
+        assert!(!glob_match("[a-y]*[^c]", "*", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "a*", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "**", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "\\*", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "a", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "a123b", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "a123c", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "ab", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "a/*", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "abc", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "abd", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "abe", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "b", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "bd", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "bb", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "bcd", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "bdir/", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "Beware", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "c", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "ca", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "cb", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "d", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "dd", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "dd", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "dd", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "de", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "baz", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "bzz", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "bzz", flags::ALL));
         // assert(!isMatch('bzz', '[a-y]*[^c]', { regex: true }));
-        assert!(!glob_match("[a-y]*[^c]", "BZZ", flags::DEFAULT));
-        assert!(glob_match("[a-y]*[^c]", "beware", flags::DEFAULT));
-        assert!(!glob_match("[a-y]*[^c]", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("[a-y]*[^c]", "BZZ", flags::ALL));
+        assert!(glob_match("[a-y]*[^c]", "beware", flags::ALL));
+        assert!(!glob_match("[a-y]*[^c]", "BewAre", flags::ALL));
 
-        assert!(glob_match("a\\*b/*", "a*b/ooo", flags::DEFAULT));
-        assert!(glob_match("a\\*?/*", "a*b/ooo", flags::DEFAULT));
+        assert!(glob_match("a\\*b/*", "a*b/ooo", flags::ALL));
+        assert!(glob_match("a\\*?/*", "a*b/ooo", flags::ALL));
 
-        assert!(!glob_match("a[b]c", "*", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "**", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "a", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "a/*", flags::DEFAULT));
-        assert!(glob_match("a[b]c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "abd", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "abe", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "b", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "bb", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "c", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "ca", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "cb", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "d", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "dd", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "de", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "baz", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "bzz", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "beware", flags::DEFAULT));
-        assert!(!glob_match("a[b]c", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("a[b]c", "*", flags::ALL));
+        assert!(!glob_match("a[b]c", "**", flags::ALL));
+        assert!(!glob_match("a[b]c", "\\*", flags::ALL));
+        assert!(!glob_match("a[b]c", "a", flags::ALL));
+        assert!(!glob_match("a[b]c", "a/*", flags::ALL));
+        assert!(glob_match("a[b]c", "abc", flags::ALL));
+        assert!(!glob_match("a[b]c", "abd", flags::ALL));
+        assert!(!glob_match("a[b]c", "abe", flags::ALL));
+        assert!(!glob_match("a[b]c", "b", flags::ALL));
+        assert!(!glob_match("a[b]c", "bb", flags::ALL));
+        assert!(!glob_match("a[b]c", "bcd", flags::ALL));
+        assert!(!glob_match("a[b]c", "bdir/", flags::ALL));
+        assert!(!glob_match("a[b]c", "Beware", flags::ALL));
+        assert!(!glob_match("a[b]c", "c", flags::ALL));
+        assert!(!glob_match("a[b]c", "ca", flags::ALL));
+        assert!(!glob_match("a[b]c", "cb", flags::ALL));
+        assert!(!glob_match("a[b]c", "d", flags::ALL));
+        assert!(!glob_match("a[b]c", "dd", flags::ALL));
+        assert!(!glob_match("a[b]c", "de", flags::ALL));
+        assert!(!glob_match("a[b]c", "baz", flags::ALL));
+        assert!(!glob_match("a[b]c", "bzz", flags::ALL));
+        assert!(!glob_match("a[b]c", "BZZ", flags::ALL));
+        assert!(!glob_match("a[b]c", "beware", flags::ALL));
+        assert!(!glob_match("a[b]c", "BewAre", flags::ALL));
 
-        assert!(!glob_match("a[\"b\"]c", "*", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "**", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "a", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "a/*", flags::DEFAULT));
-        assert!(glob_match("a[\"b\"]c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "abd", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "abe", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "b", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "bb", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "c", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "ca", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "cb", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "d", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "dd", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "de", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "baz", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "bzz", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "beware", flags::DEFAULT));
-        assert!(!glob_match("a[\"b\"]c", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("a[\"b\"]c", "*", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "**", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "\\*", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "a", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "a/*", flags::ALL));
+        assert!(glob_match("a[\"b\"]c", "abc", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "abd", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "abe", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "b", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "bb", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "bcd", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "bdir/", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "Beware", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "c", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "ca", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "cb", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "d", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "dd", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "de", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "baz", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "bzz", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "BZZ", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "beware", flags::ALL));
+        assert!(!glob_match("a[\"b\"]c", "BewAre", flags::ALL));
 
-        assert!(!glob_match("a[\\\\b]c", "*", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "**", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "a", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "a/*", flags::DEFAULT));
-        assert!(glob_match("a[\\\\b]c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "abd", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "abe", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "b", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "bb", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "c", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "ca", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "cb", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "d", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "dd", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "de", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "baz", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "bzz", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "beware", flags::DEFAULT));
-        assert!(!glob_match("a[\\\\b]c", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("a[\\\\b]c", "*", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "**", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "\\*", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "a", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "a/*", flags::ALL));
+        assert!(glob_match("a[\\\\b]c", "abc", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "abd", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "abe", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "b", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "bb", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "bcd", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "bdir/", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "Beware", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "c", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "ca", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "cb", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "d", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "dd", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "de", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "baz", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "bzz", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "BZZ", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "beware", flags::ALL));
+        assert!(!glob_match("a[\\\\b]c", "BewAre", flags::ALL));
 
-        assert!(!glob_match("a[\\b]c", "*", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "**", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "a", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "a/*", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "abd", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "abe", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "b", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "bb", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "c", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "ca", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "cb", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "d", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "dd", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "de", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "baz", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "bzz", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "beware", flags::DEFAULT));
-        assert!(!glob_match("a[\\b]c", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("a[\\b]c", "*", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "**", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "\\*", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "a", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "a/*", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "abc", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "abd", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "abe", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "b", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "bb", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "bcd", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "bdir/", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "Beware", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "c", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "ca", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "cb", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "d", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "dd", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "de", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "baz", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "bzz", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "BZZ", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "beware", flags::ALL));
+        assert!(!glob_match("a[\\b]c", "BewAre", flags::ALL));
 
-        assert!(!glob_match("a[b-d]c", "*", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "**", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "a", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "a/*", flags::DEFAULT));
-        assert!(glob_match("a[b-d]c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "abd", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "abe", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "b", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "bb", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "c", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "ca", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "cb", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "d", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "dd", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "de", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "baz", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "bzz", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "beware", flags::DEFAULT));
-        assert!(!glob_match("a[b-d]c", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("a[b-d]c", "*", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "**", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "\\*", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "a", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "a/*", flags::ALL));
+        assert!(glob_match("a[b-d]c", "abc", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "abd", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "abe", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "b", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "bb", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "bcd", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "bdir/", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "Beware", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "c", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "ca", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "cb", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "d", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "dd", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "de", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "baz", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "bzz", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "BZZ", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "beware", flags::ALL));
+        assert!(!glob_match("a[b-d]c", "BewAre", flags::ALL));
 
-        assert!(!glob_match("a?c", "*", flags::DEFAULT));
-        assert!(!glob_match("a?c", "**", flags::DEFAULT));
-        assert!(!glob_match("a?c", "\\*", flags::DEFAULT));
-        assert!(!glob_match("a?c", "a", flags::DEFAULT));
-        assert!(!glob_match("a?c", "a/*", flags::DEFAULT));
-        assert!(glob_match("a?c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a?c", "abd", flags::DEFAULT));
-        assert!(!glob_match("a?c", "abe", flags::DEFAULT));
-        assert!(!glob_match("a?c", "b", flags::DEFAULT));
-        assert!(!glob_match("a?c", "bb", flags::DEFAULT));
-        assert!(!glob_match("a?c", "bcd", flags::DEFAULT));
-        assert!(!glob_match("a?c", "bdir/", flags::DEFAULT));
-        assert!(!glob_match("a?c", "Beware", flags::DEFAULT));
-        assert!(!glob_match("a?c", "c", flags::DEFAULT));
-        assert!(!glob_match("a?c", "ca", flags::DEFAULT));
-        assert!(!glob_match("a?c", "cb", flags::DEFAULT));
-        assert!(!glob_match("a?c", "d", flags::DEFAULT));
-        assert!(!glob_match("a?c", "dd", flags::DEFAULT));
-        assert!(!glob_match("a?c", "de", flags::DEFAULT));
-        assert!(!glob_match("a?c", "baz", flags::DEFAULT));
-        assert!(!glob_match("a?c", "bzz", flags::DEFAULT));
-        assert!(!glob_match("a?c", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("a?c", "beware", flags::DEFAULT));
-        assert!(!glob_match("a?c", "BewAre", flags::DEFAULT));
+        assert!(!glob_match("a?c", "*", flags::ALL));
+        assert!(!glob_match("a?c", "**", flags::ALL));
+        assert!(!glob_match("a?c", "\\*", flags::ALL));
+        assert!(!glob_match("a?c", "a", flags::ALL));
+        assert!(!glob_match("a?c", "a/*", flags::ALL));
+        assert!(glob_match("a?c", "abc", flags::ALL));
+        assert!(!glob_match("a?c", "abd", flags::ALL));
+        assert!(!glob_match("a?c", "abe", flags::ALL));
+        assert!(!glob_match("a?c", "b", flags::ALL));
+        assert!(!glob_match("a?c", "bb", flags::ALL));
+        assert!(!glob_match("a?c", "bcd", flags::ALL));
+        assert!(!glob_match("a?c", "bdir/", flags::ALL));
+        assert!(!glob_match("a?c", "Beware", flags::ALL));
+        assert!(!glob_match("a?c", "c", flags::ALL));
+        assert!(!glob_match("a?c", "ca", flags::ALL));
+        assert!(!glob_match("a?c", "cb", flags::ALL));
+        assert!(!glob_match("a?c", "d", flags::ALL));
+        assert!(!glob_match("a?c", "dd", flags::ALL));
+        assert!(!glob_match("a?c", "de", flags::ALL));
+        assert!(!glob_match("a?c", "baz", flags::ALL));
+        assert!(!glob_match("a?c", "bzz", flags::ALL));
+        assert!(!glob_match("a?c", "BZZ", flags::ALL));
+        assert!(!glob_match("a?c", "beware", flags::ALL));
+        assert!(!glob_match("a?c", "BewAre", flags::ALL));
 
-        assert!(glob_match(
-            "*/man*/bash.*",
-            "man/man1/bash.1",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("*/man*/bash.*", "man/man1/bash.1", flags::ALL));
 
-        assert!(glob_match("[^a-c]*", "*", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "**", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "a", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "a/*", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "abc", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "abd", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "abe", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "b", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "bb", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "bcd", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "bdir/", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "Beware", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "Beware", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "c", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "ca", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "cb", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "d", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "dd", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "de", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "baz", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "bzz", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "BZZ", flags::DEFAULT));
-        assert!(!glob_match("[^a-c]*", "beware", flags::DEFAULT));
-        assert!(glob_match("[^a-c]*", "BewAre", flags::DEFAULT));
+        assert!(glob_match("[^a-c]*", "*", flags::ALL));
+        assert!(glob_match("[^a-c]*", "**", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "a", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "a/*", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "abc", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "abd", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "abe", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "b", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "bb", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "bcd", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "bdir/", flags::ALL));
+        assert!(glob_match("[^a-c]*", "Beware", flags::ALL));
+        assert!(glob_match("[^a-c]*", "Beware", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "c", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "ca", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "cb", flags::ALL));
+        assert!(glob_match("[^a-c]*", "d", flags::ALL));
+        assert!(glob_match("[^a-c]*", "dd", flags::ALL));
+        assert!(glob_match("[^a-c]*", "de", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "baz", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "bzz", flags::ALL));
+        assert!(glob_match("[^a-c]*", "BZZ", flags::ALL));
+        assert!(!glob_match("[^a-c]*", "beware", flags::ALL));
+        assert!(glob_match("[^a-c]*", "BewAre", flags::ALL));
     }
 
     #[test]
     fn bash_wildmatch() {
-        assert!(!glob_match("a[]-]b", "aab", flags::DEFAULT));
-        assert!(!glob_match("[ten]", "ten", flags::DEFAULT));
-        assert!(glob_match("]", "]", flags::DEFAULT));
-        assert!(glob_match("a[]-]b", "a-b", flags::DEFAULT));
-        assert!(glob_match("a[]-]b", "a]b", flags::DEFAULT));
-        assert!(glob_match("a[]]b", "a]b", flags::DEFAULT));
-        assert!(glob_match("a[\\]a\\-]b", "aab", flags::DEFAULT));
-        assert!(glob_match("t[a-g]n", "ten", flags::DEFAULT));
-        assert!(glob_match("t[^a-g]n", "ton", flags::DEFAULT));
+        assert!(!glob_match("a[]-]b", "aab", flags::ALL));
+        assert!(!glob_match("[ten]", "ten", flags::ALL));
+        assert!(glob_match("]", "]", flags::ALL));
+        assert!(glob_match("a[]-]b", "a-b", flags::ALL));
+        assert!(glob_match("a[]-]b", "a]b", flags::ALL));
+        assert!(glob_match("a[]]b", "a]b", flags::ALL));
+        assert!(glob_match("a[\\]a\\-]b", "aab", flags::ALL));
+        assert!(glob_match("t[a-g]n", "ten", flags::ALL));
+        assert!(glob_match("t[^a-g]n", "ton", flags::ALL));
     }
 
     #[test]
     fn bash_slashmatch() {
-        // assert!(!glob_match("f[^eiu][^eiu][^eiu][^eiu][^eiu]r", "foo/bar", flags::DEFAULT));
-        assert!(glob_match("foo[/]bar", "foo/bar", flags::DEFAULT));
+        // assert!(!glob_match("f[^eiu][^eiu][^eiu][^eiu][^eiu]r", "foo/bar", flags::ALL));
+        assert!(glob_match("foo[/]bar", "foo/bar", flags::ALL));
         assert!(glob_match(
             "f[^eiu][^eiu][^eiu][^eiu][^eiu]r",
             "foo-bar",
-            flags::DEFAULT
+            flags::ALL
         ));
     }
 
     #[test]
     fn bash_extra_stars() {
-        assert!(!glob_match("a**c", "bbc", flags::DEFAULT));
-        assert!(glob_match("a**c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a**c", "bbd", flags::DEFAULT));
+        assert!(!glob_match("a**c", "bbc", flags::ALL));
+        assert!(glob_match("a**c", "abc", flags::ALL));
+        assert!(!glob_match("a**c", "bbd", flags::ALL));
 
-        assert!(!glob_match("a***c", "bbc", flags::DEFAULT));
-        assert!(glob_match("a***c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a***c", "bbd", flags::DEFAULT));
+        assert!(!glob_match("a***c", "bbc", flags::ALL));
+        assert!(glob_match("a***c", "abc", flags::ALL));
+        assert!(!glob_match("a***c", "bbd", flags::ALL));
 
-        assert!(!glob_match("a*****?c", "bbc", flags::DEFAULT));
-        assert!(glob_match("a*****?c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a*****?c", "bbc", flags::DEFAULT));
+        assert!(!glob_match("a*****?c", "bbc", flags::ALL));
+        assert!(glob_match("a*****?c", "abc", flags::ALL));
+        assert!(!glob_match("a*****?c", "bbc", flags::ALL));
 
-        assert!(glob_match("?*****??", "bbc", flags::DEFAULT));
-        assert!(glob_match("?*****??", "abc", flags::DEFAULT));
+        assert!(glob_match("?*****??", "bbc", flags::ALL));
+        assert!(glob_match("?*****??", "abc", flags::ALL));
 
-        assert!(glob_match("*****??", "bbc", flags::DEFAULT));
-        assert!(glob_match("*****??", "abc", flags::DEFAULT));
+        assert!(glob_match("*****??", "bbc", flags::ALL));
+        assert!(glob_match("*****??", "abc", flags::ALL));
 
-        assert!(glob_match("?*****?c", "bbc", flags::DEFAULT));
-        assert!(glob_match("?*****?c", "abc", flags::DEFAULT));
+        assert!(glob_match("?*****?c", "bbc", flags::ALL));
+        assert!(glob_match("?*****?c", "abc", flags::ALL));
 
-        assert!(glob_match("?***?****c", "bbc", flags::DEFAULT));
-        assert!(glob_match("?***?****c", "abc", flags::DEFAULT));
-        assert!(!glob_match("?***?****c", "bbd", flags::DEFAULT));
+        assert!(glob_match("?***?****c", "bbc", flags::ALL));
+        assert!(glob_match("?***?****c", "abc", flags::ALL));
+        assert!(!glob_match("?***?****c", "bbd", flags::ALL));
 
-        assert!(glob_match("?***?****?", "bbc", flags::DEFAULT));
-        assert!(glob_match("?***?****?", "abc", flags::DEFAULT));
+        assert!(glob_match("?***?****?", "bbc", flags::ALL));
+        assert!(glob_match("?***?****?", "abc", flags::ALL));
 
-        assert!(glob_match("?***?****", "bbc", flags::DEFAULT));
-        assert!(glob_match("?***?****", "abc", flags::DEFAULT));
+        assert!(glob_match("?***?****", "bbc", flags::ALL));
+        assert!(glob_match("?***?****", "abc", flags::ALL));
 
-        assert!(glob_match("*******c", "bbc", flags::DEFAULT));
-        assert!(glob_match("*******c", "abc", flags::DEFAULT));
+        assert!(glob_match("*******c", "bbc", flags::ALL));
+        assert!(glob_match("*******c", "abc", flags::ALL));
 
-        assert!(glob_match("*******?", "bbc", flags::DEFAULT));
-        assert!(glob_match("*******?", "abc", flags::DEFAULT));
+        assert!(glob_match("*******?", "bbc", flags::ALL));
+        assert!(glob_match("*******?", "abc", flags::ALL));
 
-        assert!(glob_match("a*cd**?**??k", "abcdecdhjk", flags::DEFAULT));
-        assert!(glob_match("a**?**cd**?**??k", "abcdecdhjk", flags::DEFAULT));
-        assert!(glob_match(
-            "a**?**cd**?**??k***",
-            "abcdecdhjk",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a**?**cd**?**??***k",
-            "abcdecdhjk",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("a*cd**?**??k", "abcdecdhjk", flags::ALL));
+        assert!(glob_match("a**?**cd**?**??k", "abcdecdhjk", flags::ALL));
+        assert!(glob_match("a**?**cd**?**??k***", "abcdecdhjk", flags::ALL));
+        assert!(glob_match("a**?**cd**?**??***k", "abcdecdhjk", flags::ALL));
         assert!(glob_match(
             "a**?**cd**?**??***k**",
             "abcdecdhjk",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match(
-            "a****c**?**??*****",
-            "abcdecdhjk",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("a****c**?**??*****", "abcdecdhjk", flags::ALL));
     }
 
     #[test]
     fn stars() {
-        assert!(!glob_match("*.js", "a/b/c/z.js", flags::DEFAULT));
-        assert!(!glob_match("*.js", "a/b/z.js", flags::DEFAULT));
-        assert!(!glob_match("*.js", "a/z.js", flags::DEFAULT));
-        assert!(glob_match("*.js", "z.js", flags::DEFAULT));
+        assert!(!glob_match("*.js", "a/b/c/z.js", flags::ALL));
+        assert!(!glob_match("*.js", "a/b/z.js", flags::ALL));
+        assert!(!glob_match("*.js", "a/z.js", flags::ALL));
+        assert!(glob_match("*.js", "z.js", flags::ALL));
 
-        // assert!(!glob_match("*/*", "a/.ab", flags::DEFAULT));
-        // assert!(!glob_match("*", ".ab", flags::DEFAULT));
+        // assert!(!glob_match("*/*", "a/.ab", flags::ALL));
+        // assert!(!glob_match("*", ".ab", flags::ALL));
 
-        assert!(glob_match("z*.js", "z.js", flags::DEFAULT));
-        assert!(glob_match("*/*", "a/z", flags::DEFAULT));
-        assert!(glob_match("*/z*.js", "a/z.js", flags::DEFAULT));
-        assert!(glob_match("a/z*.js", "a/z.js", flags::DEFAULT));
+        assert!(glob_match("z*.js", "z.js", flags::ALL));
+        assert!(glob_match("*/*", "a/z", flags::ALL));
+        assert!(glob_match("*/z*.js", "a/z.js", flags::ALL));
+        assert!(glob_match("a/z*.js", "a/z.js", flags::ALL));
 
-        assert!(glob_match("*", "ab", flags::DEFAULT));
-        assert!(glob_match("*", "abc", flags::DEFAULT));
+        assert!(glob_match("*", "ab", flags::ALL));
+        assert!(glob_match("*", "abc", flags::ALL));
 
-        assert!(!glob_match("f*", "bar", flags::DEFAULT));
-        assert!(!glob_match("*r", "foo", flags::DEFAULT));
-        assert!(!glob_match("b*", "foo", flags::DEFAULT));
-        assert!(!glob_match("*", "foo/bar", flags::DEFAULT));
-        assert!(glob_match("*c", "abc", flags::DEFAULT));
-        assert!(glob_match("a*", "abc", flags::DEFAULT));
-        assert!(glob_match("a*c", "abc", flags::DEFAULT));
-        assert!(glob_match("*r", "bar", flags::DEFAULT));
-        assert!(glob_match("b*", "bar", flags::DEFAULT));
-        assert!(glob_match("f*", "foo", flags::DEFAULT));
+        assert!(!glob_match("f*", "bar", flags::ALL));
+        assert!(!glob_match("*r", "foo", flags::ALL));
+        assert!(!glob_match("b*", "foo", flags::ALL));
+        assert!(!glob_match("*", "foo/bar", flags::ALL));
+        assert!(glob_match("*c", "abc", flags::ALL));
+        assert!(glob_match("a*", "abc", flags::ALL));
+        assert!(glob_match("a*c", "abc", flags::ALL));
+        assert!(glob_match("*r", "bar", flags::ALL));
+        assert!(glob_match("b*", "bar", flags::ALL));
+        assert!(glob_match("f*", "foo", flags::ALL));
 
-        assert!(glob_match("*abc*", "one abc two", flags::DEFAULT));
-        assert!(glob_match("a*b", "a         b", flags::DEFAULT));
+        assert!(glob_match("*abc*", "one abc two", flags::ALL));
+        assert!(glob_match("a*b", "a         b", flags::ALL));
 
-        assert!(!glob_match("*a*", "foo", flags::DEFAULT));
-        assert!(glob_match("*a*", "bar", flags::DEFAULT));
-        assert!(glob_match("*abc*", "oneabctwo", flags::DEFAULT));
-        assert!(!glob_match("*-bc-*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*-*.*-*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*-b*c-*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*-b.c-*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*.*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*.*-*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*.*-d", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*.c-*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*b.*d", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("a*.c*", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("a-*.*-d", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("*.*", "a.b", flags::DEFAULT));
-        assert!(glob_match("*.b", "a.b", flags::DEFAULT));
-        assert!(glob_match("a.*", "a.b", flags::DEFAULT));
-        assert!(glob_match("a.b", "a.b", flags::DEFAULT));
+        assert!(!glob_match("*a*", "foo", flags::ALL));
+        assert!(glob_match("*a*", "bar", flags::ALL));
+        assert!(glob_match("*abc*", "oneabctwo", flags::ALL));
+        assert!(!glob_match("*-bc-*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*-*.*-*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*-b*c-*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*-b.c-*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*.*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*.*-*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*.*-d", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*.c-*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*b.*d", "a-b.c-d", flags::ALL));
+        assert!(glob_match("a*.c*", "a-b.c-d", flags::ALL));
+        assert!(glob_match("a-*.*-d", "a-b.c-d", flags::ALL));
+        assert!(glob_match("*.*", "a.b", flags::ALL));
+        assert!(glob_match("*.b", "a.b", flags::ALL));
+        assert!(glob_match("a.*", "a.b", flags::ALL));
+        assert!(glob_match("a.b", "a.b", flags::ALL));
 
-        assert!(!glob_match("**-bc-**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**-**.**-**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**-b**c-**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**-b.c-**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**.**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**.**-**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**.**-d", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**.c-**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**b.**d", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("a**.c**", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("a-**.**-d", "a-b.c-d", flags::DEFAULT));
-        assert!(glob_match("**.**", "a.b", flags::DEFAULT));
-        assert!(glob_match("**.b", "a.b", flags::DEFAULT));
-        assert!(glob_match("a.**", "a.b", flags::DEFAULT));
-        assert!(glob_match("a.b", "a.b", flags::DEFAULT));
+        assert!(!glob_match("**-bc-**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**-**.**-**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**-b**c-**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**-b.c-**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**.**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**.**-**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**.**-d", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**.c-**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**b.**d", "a-b.c-d", flags::ALL));
+        assert!(glob_match("a**.c**", "a-b.c-d", flags::ALL));
+        assert!(glob_match("a-**.**-d", "a-b.c-d", flags::ALL));
+        assert!(glob_match("**.**", "a.b", flags::ALL));
+        assert!(glob_match("**.b", "a.b", flags::ALL));
+        assert!(glob_match("a.**", "a.b", flags::ALL));
+        assert!(glob_match("a.b", "a.b", flags::ALL));
 
-        assert!(glob_match("*/*", "/ab", flags::DEFAULT));
-        assert!(glob_match(".", ".", flags::DEFAULT));
-        assert!(!glob_match("a/", "a/.b", flags::DEFAULT));
-        assert!(glob_match("/*", "/ab", flags::DEFAULT));
-        assert!(glob_match("/??", "/ab", flags::DEFAULT));
-        assert!(glob_match("/?b", "/ab", flags::DEFAULT));
-        assert!(glob_match("/*", "/cd", flags::DEFAULT));
-        assert!(glob_match("a", "a", flags::DEFAULT));
-        assert!(glob_match("a/.*", "a/.b", flags::DEFAULT));
-        assert!(glob_match("?/?", "a/b", flags::DEFAULT));
+        assert!(glob_match("*/*", "/ab", flags::ALL));
+        assert!(glob_match(".", ".", flags::ALL));
+        assert!(!glob_match("a/", "a/.b", flags::ALL));
+        assert!(glob_match("/*", "/ab", flags::ALL));
+        assert!(glob_match("/??", "/ab", flags::ALL));
+        assert!(glob_match("/?b", "/ab", flags::ALL));
+        assert!(glob_match("/*", "/cd", flags::ALL));
+        assert!(glob_match("a", "a", flags::ALL));
+        assert!(glob_match("a/.*", "a/.b", flags::ALL));
+        assert!(glob_match("?/?", "a/b", flags::ALL));
         assert!(glob_match(
             "a/**/j/**/z/*.md",
             "a/b/c/d/e/j/n/p/o/z/c.md",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match(
-            "a/**/z/*.md",
-            "a/b/c/d/e/z/c.md",
-            flags::DEFAULT
-        ));
-        assert!(glob_match("a/b/c/*.md", "a/b/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("a/b/c/*.md", "a/b/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("a/*/z/.a", "a/b/z/.a", flags::DEFAULT));
-        assert!(!glob_match("bz", "a/b/z/.a", flags::DEFAULT));
+        assert!(glob_match("a/**/z/*.md", "a/b/c/d/e/z/c.md", flags::ALL));
+        assert!(glob_match("a/b/c/*.md", "a/b/c/xyz.md", flags::ALL));
+        assert!(glob_match("a/b/c/*.md", "a/b/c/xyz.md", flags::ALL));
+        assert!(glob_match("a/*/z/.a", "a/b/z/.a", flags::ALL));
+        assert!(!glob_match("bz", "a/b/z/.a", flags::ALL));
         assert!(glob_match(
             "a/**/c/*.md",
             "a/bb.bb/aa/b.b/aa/c/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/**/c/*.md",
             "a/bb.bb/aa/bb/aa/c/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match("a/*/c/*.md", "a/bb.bb/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("a/*/c/*.md", "a/bb/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("a/*/c/*.md", "a/bbbb/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("*", "aaa", flags::DEFAULT));
-        assert!(glob_match("*", "ab", flags::DEFAULT));
-        assert!(glob_match("ab", "ab", flags::DEFAULT));
+        assert!(glob_match("a/*/c/*.md", "a/bb.bb/c/xyz.md", flags::ALL));
+        assert!(glob_match("a/*/c/*.md", "a/bb/c/xyz.md", flags::ALL));
+        assert!(glob_match("a/*/c/*.md", "a/bbbb/c/xyz.md", flags::ALL));
+        assert!(glob_match("*", "aaa", flags::ALL));
+        assert!(glob_match("*", "ab", flags::ALL));
+        assert!(glob_match("ab", "ab", flags::ALL));
 
-        assert!(!glob_match("*/*/*", "aaa", flags::DEFAULT));
-        assert!(!glob_match("*/*/*", "aaa/bb/aa/rr", flags::DEFAULT));
-        assert!(!glob_match("aaa*", "aaa/bba/ccc", flags::DEFAULT));
-        // assert!(!glob_match("aaa**", "aaa/bba/ccc", flags::DEFAULT));
-        assert!(!glob_match("aaa/*", "aaa/bba/ccc", flags::DEFAULT));
-        assert!(!glob_match("aaa/*ccc", "aaa/bba/ccc", flags::DEFAULT));
-        assert!(!glob_match("aaa/*z", "aaa/bba/ccc", flags::DEFAULT));
-        assert!(!glob_match("*/*/*", "aaa/bbb", flags::DEFAULT));
-        assert!(!glob_match("*/*jk*/*i", "ab/zzz/ejkl/hi", flags::DEFAULT));
-        assert!(glob_match("*/*/*", "aaa/bba/ccc", flags::DEFAULT));
-        assert!(glob_match("aaa/**", "aaa/bba/ccc", flags::DEFAULT));
-        assert!(glob_match("aaa/*", "aaa/bbb", flags::DEFAULT));
-        assert!(glob_match("*/*z*/*/*i", "ab/zzz/ejkl/hi", flags::DEFAULT));
-        assert!(glob_match("*j*i", "abzzzejklhi", flags::DEFAULT));
+        assert!(!glob_match("*/*/*", "aaa", flags::ALL));
+        assert!(!glob_match("*/*/*", "aaa/bb/aa/rr", flags::ALL));
+        assert!(!glob_match("aaa*", "aaa/bba/ccc", flags::ALL));
+        // assert!(!glob_match("aaa**", "aaa/bba/ccc", flags::ALL));
+        assert!(!glob_match("aaa/*", "aaa/bba/ccc", flags::ALL));
+        assert!(!glob_match("aaa/*ccc", "aaa/bba/ccc", flags::ALL));
+        assert!(!glob_match("aaa/*z", "aaa/bba/ccc", flags::ALL));
+        assert!(!glob_match("*/*/*", "aaa/bbb", flags::ALL));
+        assert!(!glob_match("*/*jk*/*i", "ab/zzz/ejkl/hi", flags::ALL));
+        assert!(glob_match("*/*/*", "aaa/bba/ccc", flags::ALL));
+        assert!(glob_match("aaa/**", "aaa/bba/ccc", flags::ALL));
+        assert!(glob_match("aaa/*", "aaa/bbb", flags::ALL));
+        assert!(glob_match("*/*z*/*/*i", "ab/zzz/ejkl/hi", flags::ALL));
+        assert!(glob_match("*j*i", "abzzzejklhi", flags::ALL));
 
-        assert!(glob_match("*", "a", flags::DEFAULT));
-        assert!(glob_match("*", "b", flags::DEFAULT));
-        assert!(!glob_match("*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("*", "a/a/a", flags::DEFAULT));
-        assert!(!glob_match("*", "a/a/b", flags::DEFAULT));
-        assert!(!glob_match("*", "a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("*", "a/a/a/a/a", flags::DEFAULT));
+        assert!(glob_match("*", "a", flags::ALL));
+        assert!(glob_match("*", "b", flags::ALL));
+        assert!(!glob_match("*", "a/a", flags::ALL));
+        assert!(!glob_match("*", "a/a/a", flags::ALL));
+        assert!(!glob_match("*", "a/a/b", flags::ALL));
+        assert!(!glob_match("*", "a/a/a/a", flags::ALL));
+        assert!(!glob_match("*", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("*/*", "a", flags::DEFAULT));
-        assert!(glob_match("*/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("*/*", "a/a/a", flags::DEFAULT));
+        assert!(!glob_match("*/*", "a", flags::ALL));
+        assert!(glob_match("*/*", "a/a", flags::ALL));
+        assert!(!glob_match("*/*", "a/a/a", flags::ALL));
 
-        assert!(!glob_match("*/*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*", "a/a", flags::DEFAULT));
-        assert!(glob_match("*/*/*", "a/a/a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*", "a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("*/*/*", "a", flags::ALL));
+        assert!(!glob_match("*/*/*", "a/a", flags::ALL));
+        assert!(glob_match("*/*/*", "a/a/a", flags::ALL));
+        assert!(!glob_match("*/*/*", "a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("*/*/*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*", "a/a/a", flags::DEFAULT));
-        assert!(glob_match("*/*/*/*", "a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("*/*/*/*", "a", flags::ALL));
+        assert!(!glob_match("*/*/*/*", "a/a", flags::ALL));
+        assert!(!glob_match("*/*/*/*", "a/a/a", flags::ALL));
+        assert!(glob_match("*/*/*/*", "a/a/a/a", flags::ALL));
+        assert!(!glob_match("*/*/*/*", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("*/*/*/*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*/*", "a/a/a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*/*", "a/a/b", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*/*", "a/a/a/a", flags::DEFAULT));
-        assert!(glob_match("*/*/*/*/*", "a/a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("*/*/*/*/*", "a/a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("*/*/*/*/*", "a", flags::ALL));
+        assert!(!glob_match("*/*/*/*/*", "a/a", flags::ALL));
+        assert!(!glob_match("*/*/*/*/*", "a/a/a", flags::ALL));
+        assert!(!glob_match("*/*/*/*/*", "a/a/b", flags::ALL));
+        assert!(!glob_match("*/*/*/*/*", "a/a/a/a", flags::ALL));
+        assert!(glob_match("*/*/*/*/*", "a/a/a/a/a", flags::ALL));
+        assert!(!glob_match("*/*/*/*/*", "a/a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("a/*", "a", flags::DEFAULT));
-        assert!(glob_match("a/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*", "a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*", "a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("a/*", "a", flags::ALL));
+        assert!(glob_match("a/*", "a/a", flags::ALL));
+        assert!(!glob_match("a/*", "a/a/a", flags::ALL));
+        assert!(!glob_match("a/*", "a/a/a/a", flags::ALL));
+        assert!(!glob_match("a/*", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("a/*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*", "a/a", flags::DEFAULT));
-        assert!(glob_match("a/*/*", "a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*", "b/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*", "a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("a/*/*", "a", flags::ALL));
+        assert!(!glob_match("a/*/*", "a/a", flags::ALL));
+        assert!(glob_match("a/*/*", "a/a/a", flags::ALL));
+        assert!(!glob_match("a/*/*", "b/a/a", flags::ALL));
+        assert!(!glob_match("a/*/*", "a/a/a/a", flags::ALL));
+        assert!(!glob_match("a/*/*", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("a/*/*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*/*", "a/a/a", flags::DEFAULT));
-        assert!(glob_match("a/*/*/*", "a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*/*", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("a/*/*/*", "a", flags::ALL));
+        assert!(!glob_match("a/*/*/*", "a/a", flags::ALL));
+        assert!(!glob_match("a/*/*/*", "a/a/a", flags::ALL));
+        assert!(glob_match("a/*/*/*", "a/a/a/a", flags::ALL));
+        assert!(!glob_match("a/*/*/*", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("a/*/*/*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*/*/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*/*/*", "a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/*/*/*", "a/a/b", flags::DEFAULT));
-        assert!(!glob_match("a/*/*/*/*", "a/a/a/a", flags::DEFAULT));
-        assert!(glob_match("a/*/*/*/*", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("a/*/*/*/*", "a", flags::ALL));
+        assert!(!glob_match("a/*/*/*/*", "a/a", flags::ALL));
+        assert!(!glob_match("a/*/*/*/*", "a/a/a", flags::ALL));
+        assert!(!glob_match("a/*/*/*/*", "a/a/b", flags::ALL));
+        assert!(!glob_match("a/*/*/*/*", "a/a/a/a", flags::ALL));
+        assert!(glob_match("a/*/*/*/*", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("a/*/a", "a", flags::DEFAULT));
-        assert!(!glob_match("a/*/a", "a/a", flags::DEFAULT));
-        assert!(glob_match("a/*/a", "a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/a", "a/a/b", flags::DEFAULT));
-        assert!(!glob_match("a/*/a", "a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/a", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("a/*/a", "a", flags::ALL));
+        assert!(!glob_match("a/*/a", "a/a", flags::ALL));
+        assert!(glob_match("a/*/a", "a/a/a", flags::ALL));
+        assert!(!glob_match("a/*/a", "a/a/b", flags::ALL));
+        assert!(!glob_match("a/*/a", "a/a/a/a", flags::ALL));
+        assert!(!glob_match("a/*/a", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("a/*/b", "a", flags::DEFAULT));
-        assert!(!glob_match("a/*/b", "a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/b", "a/a/a", flags::DEFAULT));
-        assert!(glob_match("a/*/b", "a/a/b", flags::DEFAULT));
-        assert!(!glob_match("a/*/b", "a/a/a/a", flags::DEFAULT));
-        assert!(!glob_match("a/*/b", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("a/*/b", "a", flags::ALL));
+        assert!(!glob_match("a/*/b", "a/a", flags::ALL));
+        assert!(!glob_match("a/*/b", "a/a/a", flags::ALL));
+        assert!(glob_match("a/*/b", "a/a/b", flags::ALL));
+        assert!(!glob_match("a/*/b", "a/a/a/a", flags::ALL));
+        assert!(!glob_match("a/*/b", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("*/**/a", "a", flags::DEFAULT));
-        assert!(!glob_match("*/**/a", "a/a/b", flags::DEFAULT));
-        assert!(glob_match("*/**/a", "a/a", flags::DEFAULT));
-        assert!(glob_match("*/**/a", "a/a/a", flags::DEFAULT));
-        assert!(glob_match("*/**/a", "a/a/a/a", flags::DEFAULT));
-        assert!(glob_match("*/**/a", "a/a/a/a/a", flags::DEFAULT));
+        assert!(!glob_match("*/**/a", "a", flags::ALL));
+        assert!(!glob_match("*/**/a", "a/a/b", flags::ALL));
+        assert!(glob_match("*/**/a", "a/a", flags::ALL));
+        assert!(glob_match("*/**/a", "a/a/a", flags::ALL));
+        assert!(glob_match("*/**/a", "a/a/a/a", flags::ALL));
+        assert!(glob_match("*/**/a", "a/a/a/a/a", flags::ALL));
 
-        assert!(!glob_match("*/", "a", flags::DEFAULT));
-        assert!(!glob_match("*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("a/*", "a", flags::DEFAULT));
-        // assert!(!glob_match("*/*", "a/", flags::DEFAULT));
-        // assert!(!glob_match("a/*", "a/", flags::DEFAULT));
-        assert!(!glob_match("*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("*/", "a/a", flags::DEFAULT));
-        assert!(!glob_match("*/", "a/x/y", flags::DEFAULT));
-        assert!(!glob_match("*/*", "a/x/y", flags::DEFAULT));
-        assert!(!glob_match("a/*", "a/x/y", flags::DEFAULT));
-        // assert!(glob_match("*", "a/", flags::DEFAULT));
-        assert!(glob_match("*", "a", flags::DEFAULT));
-        assert!(glob_match("*/", "a/", flags::DEFAULT));
-        assert!(glob_match("*{,/}", "a/", flags::DEFAULT));
-        assert!(glob_match("*/*", "a/a", flags::DEFAULT));
-        assert!(glob_match("a/*", "a/a", flags::DEFAULT));
+        assert!(!glob_match("*/", "a", flags::ALL));
+        assert!(!glob_match("*/*", "a", flags::ALL));
+        assert!(!glob_match("a/*", "a", flags::ALL));
+        // assert!(!glob_match("*/*", "a/", flags::ALL));
+        // assert!(!glob_match("a/*", "a/", flags::ALL));
+        assert!(!glob_match("*", "a/a", flags::ALL));
+        assert!(!glob_match("*/", "a/a", flags::ALL));
+        assert!(!glob_match("*/", "a/x/y", flags::ALL));
+        assert!(!glob_match("*/*", "a/x/y", flags::ALL));
+        assert!(!glob_match("a/*", "a/x/y", flags::ALL));
+        // assert!(glob_match("*", "a/", flags::ALL));
+        assert!(glob_match("*", "a", flags::ALL));
+        assert!(glob_match("*/", "a/", flags::ALL));
+        assert!(glob_match("*{,/}", "a/", flags::ALL));
+        assert!(glob_match("*/*", "a/a", flags::ALL));
+        assert!(glob_match("a/*", "a/a", flags::ALL));
 
-        assert!(!glob_match("a/**/*.txt", "a.txt", flags::DEFAULT));
-        assert!(glob_match("a/**/*.txt", "a/x/y.txt", flags::DEFAULT));
-        assert!(!glob_match("a/**/*.txt", "a/x/y/z", flags::DEFAULT));
+        assert!(!glob_match("a/**/*.txt", "a.txt", flags::ALL));
+        assert!(glob_match("a/**/*.txt", "a/x/y.txt", flags::ALL));
+        assert!(!glob_match("a/**/*.txt", "a/x/y/z", flags::ALL));
 
-        assert!(!glob_match("a/*.txt", "a.txt", flags::DEFAULT));
-        assert!(glob_match("a/*.txt", "a/b.txt", flags::DEFAULT));
-        assert!(!glob_match("a/*.txt", "a/x/y.txt", flags::DEFAULT));
-        assert!(!glob_match("a/*.txt", "a/x/y/z", flags::DEFAULT));
+        assert!(!glob_match("a/*.txt", "a.txt", flags::ALL));
+        assert!(glob_match("a/*.txt", "a/b.txt", flags::ALL));
+        assert!(!glob_match("a/*.txt", "a/x/y.txt", flags::ALL));
+        assert!(!glob_match("a/*.txt", "a/x/y/z", flags::ALL));
 
-        assert!(glob_match("a*.txt", "a.txt", flags::DEFAULT));
-        assert!(!glob_match("a*.txt", "a/b.txt", flags::DEFAULT));
-        assert!(!glob_match("a*.txt", "a/x/y.txt", flags::DEFAULT));
-        assert!(!glob_match("a*.txt", "a/x/y/z", flags::DEFAULT));
+        assert!(glob_match("a*.txt", "a.txt", flags::ALL));
+        assert!(!glob_match("a*.txt", "a/b.txt", flags::ALL));
+        assert!(!glob_match("a*.txt", "a/x/y.txt", flags::ALL));
+        assert!(!glob_match("a*.txt", "a/x/y/z", flags::ALL));
 
-        assert!(glob_match("*.txt", "a.txt", flags::DEFAULT));
-        assert!(!glob_match("*.txt", "a/b.txt", flags::DEFAULT));
-        assert!(!glob_match("*.txt", "a/x/y.txt", flags::DEFAULT));
-        assert!(!glob_match("*.txt", "a/x/y/z", flags::DEFAULT));
+        assert!(glob_match("*.txt", "a.txt", flags::ALL));
+        assert!(!glob_match("*.txt", "a/b.txt", flags::ALL));
+        assert!(!glob_match("*.txt", "a/x/y.txt", flags::ALL));
+        assert!(!glob_match("*.txt", "a/x/y/z", flags::ALL));
 
-        assert!(!glob_match("a*", "a/b", flags::DEFAULT));
-        assert!(!glob_match("a/**/b", "a/a/bb", flags::DEFAULT));
-        assert!(!glob_match("a/**/b", "a/bb", flags::DEFAULT));
+        assert!(!glob_match("a*", "a/b", flags::ALL));
+        assert!(!glob_match("a/**/b", "a/a/bb", flags::ALL));
+        assert!(!glob_match("a/**/b", "a/bb", flags::ALL));
 
-        assert!(!glob_match("*/**", "foo", flags::DEFAULT));
-        assert!(!glob_match("**/", "foo/bar", flags::DEFAULT));
-        assert!(!glob_match("**/*/", "foo/bar", flags::DEFAULT));
-        assert!(!glob_match("*/*/", "foo/bar", flags::DEFAULT));
+        assert!(!glob_match("*/**", "foo", flags::ALL));
+        assert!(!glob_match("**/", "foo/bar", flags::ALL));
+        assert!(!glob_match("**/*/", "foo/bar", flags::ALL));
+        assert!(!glob_match("*/*/", "foo/bar", flags::ALL));
 
-        assert!(glob_match("**/..", "/home/foo/..", flags::DEFAULT));
-        assert!(glob_match("**/a", "a", flags::DEFAULT));
-        assert!(glob_match("**", "a/a", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/a", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/", flags::DEFAULT));
-        // assert!(glob_match("a/**", "a", flags::DEFAULT));
-        assert!(!glob_match("**/", "a/a", flags::DEFAULT));
-        // assert!(glob_match("**/a/**", "a", flags::DEFAULT));
-        // assert!(glob_match("a/**", "a", flags::DEFAULT));
-        assert!(!glob_match("**/", "a/a", flags::DEFAULT));
-        assert!(glob_match("*/**/a", "a/a", flags::DEFAULT));
-        // assert!(glob_match("a/**", "a", flags::DEFAULT));
-        assert!(glob_match("*/**", "foo/", flags::DEFAULT));
-        assert!(glob_match("**/*", "foo/bar", flags::DEFAULT));
-        assert!(glob_match("*/*", "foo/bar", flags::DEFAULT));
-        assert!(glob_match("*/**", "foo/bar", flags::DEFAULT));
-        assert!(glob_match("**/", "foo/bar/", flags::DEFAULT));
-        // assert!(glob_match("**/*", "foo/bar/", flags::DEFAULT));
-        assert!(glob_match("**/*/", "foo/bar/", flags::DEFAULT));
-        assert!(glob_match("*/**", "foo/bar/", flags::DEFAULT));
-        assert!(glob_match("*/*/", "foo/bar/", flags::DEFAULT));
+        assert!(glob_match("**/..", "/home/foo/..", flags::ALL));
+        assert!(glob_match("**/a", "a", flags::ALL));
+        assert!(glob_match("**", "a/a", flags::ALL));
+        assert!(glob_match("a/**", "a/a", flags::ALL));
+        assert!(glob_match("a/**", "a/", flags::ALL));
+        // assert!(glob_match("a/**", "a", flags::ALL));
+        assert!(!glob_match("**/", "a/a", flags::ALL));
+        // assert!(glob_match("**/a/**", "a", flags::ALL));
+        // assert!(glob_match("a/**", "a", flags::ALL));
+        assert!(!glob_match("**/", "a/a", flags::ALL));
+        assert!(glob_match("*/**/a", "a/a", flags::ALL));
+        // assert!(glob_match("a/**", "a", flags::ALL));
+        assert!(glob_match("*/**", "foo/", flags::ALL));
+        assert!(glob_match("**/*", "foo/bar", flags::ALL));
+        assert!(glob_match("*/*", "foo/bar", flags::ALL));
+        assert!(glob_match("*/**", "foo/bar", flags::ALL));
+        assert!(glob_match("**/", "foo/bar/", flags::ALL));
+        // assert!(glob_match("**/*", "foo/bar/", flags::ALL));
+        assert!(glob_match("**/*/", "foo/bar/", flags::ALL));
+        assert!(glob_match("*/**", "foo/bar/", flags::ALL));
+        assert!(glob_match("*/*/", "foo/bar/", flags::ALL));
 
-        assert!(!glob_match("*/foo", "bar/baz/foo", flags::DEFAULT));
-        assert!(!glob_match("**/bar/*", "deep/foo/bar", flags::DEFAULT));
-        assert!(!glob_match(
-            "*/bar/**",
-            "deep/foo/bar/baz/x",
-            flags::DEFAULT
-        ));
-        assert!(!glob_match("/*", "ef", flags::DEFAULT));
-        assert!(!glob_match("foo?bar", "foo/bar", flags::DEFAULT));
-        assert!(!glob_match("**/bar*", "foo/bar/baz", flags::DEFAULT));
-        // assert!(!glob_match("**/bar**", "foo/bar/baz", flags::DEFAULT));
-        assert!(!glob_match("foo**bar", "foo/baz/bar", flags::DEFAULT));
-        assert!(!glob_match("foo*bar", "foo/baz/bar", flags::DEFAULT));
-        // assert!(glob_match("foo/**", "foo", flags::DEFAULT));
-        assert!(glob_match("/*", "/ab", flags::DEFAULT));
-        assert!(glob_match("/*", "/cd", flags::DEFAULT));
-        assert!(glob_match("/*", "/ef", flags::DEFAULT));
-        assert!(glob_match(
-            "a/**/j/**/z/*.md",
-            "a/b/j/c/z/x.md",
-            flags::DEFAULT
-        ));
-        assert!(glob_match("a/**/j/**/z/*.md", "a/j/z/x.md", flags::DEFAULT));
+        assert!(!glob_match("*/foo", "bar/baz/foo", flags::ALL));
+        assert!(!glob_match("**/bar/*", "deep/foo/bar", flags::ALL));
+        assert!(!glob_match("*/bar/**", "deep/foo/bar/baz/x", flags::ALL));
+        assert!(!glob_match("/*", "ef", flags::ALL));
+        assert!(!glob_match("foo?bar", "foo/bar", flags::ALL));
+        assert!(!glob_match("**/bar*", "foo/bar/baz", flags::ALL));
+        // assert!(!glob_match("**/bar**", "foo/bar/baz", flags::ALL));
+        assert!(!glob_match("foo**bar", "foo/baz/bar", flags::ALL));
+        assert!(!glob_match("foo*bar", "foo/baz/bar", flags::ALL));
+        // assert!(glob_match("foo/**", "foo", flags::ALL));
+        assert!(glob_match("/*", "/ab", flags::ALL));
+        assert!(glob_match("/*", "/cd", flags::ALL));
+        assert!(glob_match("/*", "/ef", flags::ALL));
+        assert!(glob_match("a/**/j/**/z/*.md", "a/b/j/c/z/x.md", flags::ALL));
+        assert!(glob_match("a/**/j/**/z/*.md", "a/j/z/x.md", flags::ALL));
 
-        assert!(glob_match("**/foo", "bar/baz/foo", flags::DEFAULT));
-        assert!(glob_match("**/bar/*", "deep/foo/bar/baz", flags::DEFAULT));
-        assert!(glob_match("**/bar/**", "deep/foo/bar/baz/", flags::DEFAULT));
-        assert!(glob_match(
-            "**/bar/*/*",
-            "deep/foo/bar/baz/x",
-            flags::DEFAULT
-        ));
-        assert!(glob_match("foo/**/**/bar", "foo/b/a/z/bar", flags::DEFAULT));
-        assert!(glob_match("foo/**/bar", "foo/b/a/z/bar", flags::DEFAULT));
-        assert!(glob_match("foo/**/**/bar", "foo/bar", flags::DEFAULT));
-        assert!(glob_match("foo/**/bar", "foo/bar", flags::DEFAULT));
-        assert!(glob_match("*/bar/**", "foo/bar/baz/x", flags::DEFAULT));
-        assert!(glob_match("foo/**/**/bar", "foo/baz/bar", flags::DEFAULT));
-        assert!(glob_match("foo/**/bar", "foo/baz/bar", flags::DEFAULT));
-        assert!(glob_match("**/foo", "XXX/foo", flags::DEFAULT));
+        assert!(glob_match("**/foo", "bar/baz/foo", flags::ALL));
+        assert!(glob_match("**/bar/*", "deep/foo/bar/baz", flags::ALL));
+        assert!(glob_match("**/bar/**", "deep/foo/bar/baz/", flags::ALL));
+        assert!(glob_match("**/bar/*/*", "deep/foo/bar/baz/x", flags::ALL));
+        assert!(glob_match("foo/**/**/bar", "foo/b/a/z/bar", flags::ALL));
+        assert!(glob_match("foo/**/bar", "foo/b/a/z/bar", flags::ALL));
+        assert!(glob_match("foo/**/**/bar", "foo/bar", flags::ALL));
+        assert!(glob_match("foo/**/bar", "foo/bar", flags::ALL));
+        assert!(glob_match("*/bar/**", "foo/bar/baz/x", flags::ALL));
+        assert!(glob_match("foo/**/**/bar", "foo/baz/bar", flags::ALL));
+        assert!(glob_match("foo/**/bar", "foo/baz/bar", flags::ALL));
+        assert!(glob_match("**/foo", "XXX/foo", flags::ALL));
     }
 
     #[test]
     fn globstars() {
-        assert!(glob_match("**/*.js", "a/b/c/d.js", flags::DEFAULT));
-        assert!(glob_match("**/*.js", "a/b/c.js", flags::DEFAULT));
-        assert!(glob_match("**/*.js", "a/b.js", flags::DEFAULT));
-        assert!(glob_match("a/b/**/*.js", "a/b/c/d/e/f.js", flags::DEFAULT));
-        assert!(glob_match("a/b/**/*.js", "a/b/c/d/e.js", flags::DEFAULT));
-        assert!(glob_match("a/b/c/**/*.js", "a/b/c/d.js", flags::DEFAULT));
-        assert!(glob_match("a/b/**/*.js", "a/b/c/d.js", flags::DEFAULT));
-        assert!(glob_match("a/b/**/*.js", "a/b/d.js", flags::DEFAULT));
-        assert!(!glob_match("a/b/**/*.js", "a/d.js", flags::DEFAULT));
-        assert!(!glob_match("a/b/**/*.js", "d.js", flags::DEFAULT));
+        assert!(glob_match("**/*.js", "a/b/c/d.js", flags::ALL));
+        assert!(glob_match("**/*.js", "a/b/c.js", flags::ALL));
+        assert!(glob_match("**/*.js", "a/b.js", flags::ALL));
+        assert!(glob_match("a/b/**/*.js", "a/b/c/d/e/f.js", flags::ALL));
+        assert!(glob_match("a/b/**/*.js", "a/b/c/d/e.js", flags::ALL));
+        assert!(glob_match("a/b/c/**/*.js", "a/b/c/d.js", flags::ALL));
+        assert!(glob_match("a/b/**/*.js", "a/b/c/d.js", flags::ALL));
+        assert!(glob_match("a/b/**/*.js", "a/b/d.js", flags::ALL));
+        assert!(!glob_match("a/b/**/*.js", "a/d.js", flags::ALL));
+        assert!(!glob_match("a/b/**/*.js", "d.js", flags::ALL));
 
-        assert!(!glob_match("**c", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("a/**c", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("a/**z", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("a/**b**/c", "a/b/c/b/c", flags::DEFAULT));
-        assert!(!glob_match("a/b/c**/*.js", "a/b/c/d/e.js", flags::DEFAULT));
-        assert!(glob_match("a/**/b/**/c", "a/b/c/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**b**/c", "a/aba/c", flags::DEFAULT));
-        assert!(glob_match("a/**b**/c", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/b/c**/*.js", "a/b/c/d.js", flags::DEFAULT));
+        assert!(!glob_match("**c", "a/b/c", flags::ALL));
+        assert!(!glob_match("a/**c", "a/b/c", flags::ALL));
+        assert!(!glob_match("a/**z", "a/b/c", flags::ALL));
+        assert!(!glob_match("a/**b**/c", "a/b/c/b/c", flags::ALL));
+        assert!(!glob_match("a/b/c**/*.js", "a/b/c/d/e.js", flags::ALL));
+        assert!(glob_match("a/**/b/**/c", "a/b/c/b/c", flags::ALL));
+        assert!(glob_match("a/**b**/c", "a/aba/c", flags::ALL));
+        assert!(glob_match("a/**b**/c", "a/b/c", flags::ALL));
+        assert!(glob_match("a/b/c**/*.js", "a/b/c/d.js", flags::ALL));
 
-        assert!(!glob_match("a/**/*", "a", flags::DEFAULT));
-        assert!(!glob_match("a/**/**/*", "a", flags::DEFAULT));
-        assert!(!glob_match("a/**/**/**/*", "a", flags::DEFAULT));
-        assert!(!glob_match("**/a", "a/", flags::DEFAULT));
-        assert!(!glob_match("a/**/*", "a/", flags::DEFAULT));
-        assert!(!glob_match("a/**/**/*", "a/", flags::DEFAULT));
-        assert!(!glob_match("a/**/**/**/*", "a/", flags::DEFAULT));
-        assert!(!glob_match("**/a", "a/b", flags::DEFAULT));
+        assert!(!glob_match("a/**/*", "a", flags::ALL));
+        assert!(!glob_match("a/**/**/*", "a", flags::ALL));
+        assert!(!glob_match("a/**/**/**/*", "a", flags::ALL));
+        assert!(!glob_match("**/a", "a/", flags::ALL));
+        assert!(!glob_match("a/**/*", "a/", flags::ALL));
+        assert!(!glob_match("a/**/**/*", "a/", flags::ALL));
+        assert!(!glob_match("a/**/**/**/*", "a/", flags::ALL));
+        assert!(!glob_match("**/a", "a/b", flags::ALL));
         assert!(!glob_match(
             "a/**/j/**/z/*.md",
             "a/b/c/j/e/z/c.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(!glob_match("a/**/b", "a/bb", flags::DEFAULT));
-        assert!(!glob_match("**/a", "a/c", flags::DEFAULT));
-        assert!(!glob_match("**/a", "a/b", flags::DEFAULT));
-        assert!(!glob_match("**/a", "a/x/y", flags::DEFAULT));
-        assert!(!glob_match("**/a", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**", "a", flags::DEFAULT));
-        assert!(glob_match("**/a", "a", flags::DEFAULT));
-        // assert!(glob_match("a/**", "a", flags::DEFAULT));
-        assert!(glob_match("**", "a/", flags::DEFAULT));
-        assert!(glob_match("**/a/**", "a/", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/", flags::DEFAULT));
-        assert!(glob_match("a/**/**", "a/", flags::DEFAULT));
-        assert!(glob_match("**/a", "a/a", flags::DEFAULT));
-        assert!(glob_match("**", "a/b", flags::DEFAULT));
-        assert!(glob_match("*/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**/**/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**/**/**/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**/b", "a/b", flags::DEFAULT));
-        assert!(glob_match("**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("*/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**/**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**/**/**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/**/*", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/**/**/*", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/**/**/**/*", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/b/**/c/**/*.*", "a/b/c/d.e", flags::DEFAULT));
-        assert!(glob_match(
-            "a/**/f/*.md",
-            "a/b/c/d/e/f/g.md",
-            flags::DEFAULT
-        ));
+        assert!(!glob_match("a/**/b", "a/bb", flags::ALL));
+        assert!(!glob_match("**/a", "a/c", flags::ALL));
+        assert!(!glob_match("**/a", "a/b", flags::ALL));
+        assert!(!glob_match("**/a", "a/x/y", flags::ALL));
+        assert!(!glob_match("**/a", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**", "a", flags::ALL));
+        assert!(glob_match("**/a", "a", flags::ALL));
+        // assert!(glob_match("a/**", "a", flags::ALL));
+        assert!(glob_match("**", "a/", flags::ALL));
+        assert!(glob_match("**/a/**", "a/", flags::ALL));
+        assert!(glob_match("a/**", "a/", flags::ALL));
+        assert!(glob_match("a/**/**", "a/", flags::ALL));
+        assert!(glob_match("**/a", "a/a", flags::ALL));
+        assert!(glob_match("**", "a/b", flags::ALL));
+        assert!(glob_match("*/*", "a/b", flags::ALL));
+        assert!(glob_match("a/**", "a/b", flags::ALL));
+        assert!(glob_match("a/**/*", "a/b", flags::ALL));
+        assert!(glob_match("a/**/**/*", "a/b", flags::ALL));
+        assert!(glob_match("a/**/**/**/*", "a/b", flags::ALL));
+        assert!(glob_match("a/**/b", "a/b", flags::ALL));
+        assert!(glob_match("**", "a/b/c", flags::ALL));
+        assert!(glob_match("**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("**/**", "a/b/c", flags::ALL));
+        assert!(glob_match("*/**", "a/b/c", flags::ALL));
+        assert!(glob_match("a/**", "a/b/c", flags::ALL));
+        assert!(glob_match("a/**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("a/**/**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("a/**/**/**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/**/*", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/**/**/*", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/**/**/**/*", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/b/**/c/**/*.*", "a/b/c/d.e", flags::ALL));
+        assert!(glob_match("a/**/f/*.md", "a/b/c/d/e/f/g.md", flags::ALL));
         assert!(glob_match(
             "a/**/f/**/k/*.md",
             "a/b/c/d/e/f/g/h/i/j/k/l.md",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match("a/b/c/*.md", "a/b/c/def.md", flags::DEFAULT));
-        assert!(glob_match("a/*/c/*.md", "a/bb.bb/c/ddd.md", flags::DEFAULT));
+        assert!(glob_match("a/b/c/*.md", "a/b/c/def.md", flags::ALL));
+        assert!(glob_match("a/*/c/*.md", "a/bb.bb/c/ddd.md", flags::ALL));
         assert!(glob_match(
             "a/**/f/*.md",
             "a/bb.bb/cc/d.d/ee/f/ggg.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/**/f/*.md",
             "a/bb.bb/cc/dd/ee/f/ggg.md",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match("a/*/c/*.md", "a/bb/c/ddd.md", flags::DEFAULT));
-        assert!(glob_match("a/*/c/*.md", "a/bbbb/c/ddd.md", flags::DEFAULT));
+        assert!(glob_match("a/*/c/*.md", "a/bb/c/ddd.md", flags::ALL));
+        assert!(glob_match("a/*/c/*.md", "a/bbbb/c/ddd.md", flags::ALL));
 
         assert!(glob_match(
             "foo/bar/**/one/**/*.*",
             "foo/bar/baz/one/image.png",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "foo/bar/**/one/**/*.*",
             "foo/bar/baz/one/two/image.png",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "foo/bar/**/one/**/*.*",
             "foo/bar/baz/one/two/three/image.png",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(!glob_match("a/b/**/f", "a/b/c/d/", flags::DEFAULT));
-        // assert!(glob_match("a/**", "a", flags::DEFAULT));
-        assert!(glob_match("**", "a", flags::DEFAULT));
-        // assert!(glob_match("a{,/**}", "a", flags::DEFAULT));
-        assert!(glob_match("**", "a/", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/", flags::DEFAULT));
-        assert!(glob_match("**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("**/**", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("**/b/**", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("a/b/**", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("a/b/**/", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("a/b/**/c/**/", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("a/b/**/c/**/d/", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("a/b/**/**/*.*", "a/b/c/d/e.f", flags::DEFAULT));
-        assert!(glob_match("a/b/**/*.*", "a/b/c/d/e.f", flags::DEFAULT));
-        assert!(glob_match(
-            "a/b/**/c/**/d/*.*",
-            "a/b/c/d/e.f",
-            flags::DEFAULT
-        ));
-        assert!(glob_match("a/b/**/d/**/*.*", "a/b/c/d/e.f", flags::DEFAULT));
-        assert!(glob_match(
-            "a/b/**/d/**/*.*",
-            "a/b/c/d/g/e.f",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a/b/**/d/**/*.*",
-            "a/b/c/d/g/g/e.f",
-            flags::DEFAULT
-        ));
-        assert!(glob_match("a/b-*/**/z.js", "a/b-c/z.js", flags::DEFAULT));
-        assert!(glob_match(
-            "a/b-*/**/z.js",
-            "a/b-c/d/e/z.js",
-            flags::DEFAULT
-        ));
+        assert!(!glob_match("a/b/**/f", "a/b/c/d/", flags::ALL));
+        // assert!(glob_match("a/**", "a", flags::ALL));
+        assert!(glob_match("**", "a", flags::ALL));
+        // assert!(glob_match("a{,/**}", "a", flags::ALL));
+        assert!(glob_match("**", "a/", flags::ALL));
+        assert!(glob_match("a/**", "a/", flags::ALL));
+        assert!(glob_match("**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("**/**", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("**/b/**", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("a/b/**", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("a/b/**/", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("a/b/**/c/**/", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("a/b/**/c/**/d/", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("a/b/**/**/*.*", "a/b/c/d/e.f", flags::ALL));
+        assert!(glob_match("a/b/**/*.*", "a/b/c/d/e.f", flags::ALL));
+        assert!(glob_match("a/b/**/c/**/d/*.*", "a/b/c/d/e.f", flags::ALL));
+        assert!(glob_match("a/b/**/d/**/*.*", "a/b/c/d/e.f", flags::ALL));
+        assert!(glob_match("a/b/**/d/**/*.*", "a/b/c/d/g/e.f", flags::ALL));
+        assert!(glob_match("a/b/**/d/**/*.*", "a/b/c/d/g/g/e.f", flags::ALL));
+        assert!(glob_match("a/b-*/**/z.js", "a/b-c/z.js", flags::ALL));
+        assert!(glob_match("a/b-*/**/z.js", "a/b-c/d/e/z.js", flags::ALL));
 
-        assert!(glob_match("*/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/b/c/*.md", "a/b/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("a/*/c/*.md", "a/bb.bb/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("a/*/c/*.md", "a/bb/c/xyz.md", flags::DEFAULT));
-        assert!(glob_match("a/*/c/*.md", "a/bbbb/c/xyz.md", flags::DEFAULT));
+        assert!(glob_match("*/*", "a/b", flags::ALL));
+        assert!(glob_match("a/b/c/*.md", "a/b/c/xyz.md", flags::ALL));
+        assert!(glob_match("a/*/c/*.md", "a/bb.bb/c/xyz.md", flags::ALL));
+        assert!(glob_match("a/*/c/*.md", "a/bb/c/xyz.md", flags::ALL));
+        assert!(glob_match("a/*/c/*.md", "a/bbbb/c/xyz.md", flags::ALL));
 
-        assert!(glob_match("**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("*/**", "a/b/c", flags::DEFAULT));
+        assert!(glob_match("**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("**/**", "a/b/c", flags::ALL));
+        assert!(glob_match("*/**", "a/b/c", flags::ALL));
         assert!(glob_match(
             "a/**/j/**/z/*.md",
             "a/b/c/d/e/j/n/p/o/z/c.md",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match(
-            "a/**/z/*.md",
-            "a/b/c/d/e/z/c.md",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("a/**/z/*.md", "a/b/c/d/e/z/c.md", flags::ALL));
         assert!(glob_match(
             "a/**/c/*.md",
             "a/bb.bb/aa/b.b/aa/c/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/**/c/*.md",
             "a/bb.bb/aa/bb/aa/c/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "a/**/j/**/z/*.md",
             "a/b/c/j/e/z/c.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "a/b/**/c{d,e}/**/xyz.md",
             "a/b/c/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "a/b/**/c{d,e}/**/xyz.md",
             "a/b/d/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(!glob_match("a/**/", "a/b", flags::DEFAULT));
-        // assert!(!glob_match("**/*", "a/b/.js/c.txt", flags::DEFAULT));
-        assert!(!glob_match("a/**/", "a/b/c/d", flags::DEFAULT));
-        assert!(!glob_match("a/**/", "a/bb", flags::DEFAULT));
-        assert!(!glob_match("a/**/", "a/cb", flags::DEFAULT));
-        assert!(glob_match("/**", "/a/b", flags::DEFAULT));
-        assert!(glob_match("**/*", "a.b", flags::DEFAULT));
-        assert!(glob_match("**/*", "a.js", flags::DEFAULT));
-        assert!(glob_match("**/*.js", "a.js", flags::DEFAULT));
-        // assert!(glob_match("a/**/", "a/", flags::DEFAULT));
-        assert!(glob_match("**/*.js", "a/a.js", flags::DEFAULT));
-        assert!(glob_match("**/*.js", "a/a/b.js", flags::DEFAULT));
-        assert!(glob_match("a/**/b", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**b", "a/b", flags::DEFAULT));
-        assert!(glob_match("**/*.md", "a/b.md", flags::DEFAULT));
-        assert!(glob_match("**/*", "a/b/c.js", flags::DEFAULT));
-        assert!(glob_match("**/*", "a/b/c.txt", flags::DEFAULT));
-        assert!(glob_match("a/**/", "a/b/c/d/", flags::DEFAULT));
-        assert!(glob_match("**/*", "a/b/c/d/a.js", flags::DEFAULT));
-        assert!(glob_match("a/b/**/*.js", "a/b/c/z.js", flags::DEFAULT));
-        assert!(glob_match("a/b/**/*.js", "a/b/z.js", flags::DEFAULT));
-        assert!(glob_match("**/*", "ab", flags::DEFAULT));
-        assert!(glob_match("**/*", "ab/c", flags::DEFAULT));
-        assert!(glob_match("**/*", "ab/c/d", flags::DEFAULT));
-        assert!(glob_match("**/*", "abc.js", flags::DEFAULT));
+        assert!(!glob_match("a/**/", "a/b", flags::ALL));
+        // assert!(!glob_match("**/*", "a/b/.js/c.txt", flags::ALL));
+        assert!(!glob_match("a/**/", "a/b/c/d", flags::ALL));
+        assert!(!glob_match("a/**/", "a/bb", flags::ALL));
+        assert!(!glob_match("a/**/", "a/cb", flags::ALL));
+        assert!(glob_match("/**", "/a/b", flags::ALL));
+        assert!(glob_match("**/*", "a.b", flags::ALL));
+        assert!(glob_match("**/*", "a.js", flags::ALL));
+        assert!(glob_match("**/*.js", "a.js", flags::ALL));
+        // assert!(glob_match("a/**/", "a/", flags::ALL));
+        assert!(glob_match("**/*.js", "a/a.js", flags::ALL));
+        assert!(glob_match("**/*.js", "a/a/b.js", flags::ALL));
+        assert!(glob_match("a/**/b", "a/b", flags::ALL));
+        assert!(glob_match("a/**b", "a/b", flags::ALL));
+        assert!(glob_match("**/*.md", "a/b.md", flags::ALL));
+        assert!(glob_match("**/*", "a/b/c.js", flags::ALL));
+        assert!(glob_match("**/*", "a/b/c.txt", flags::ALL));
+        assert!(glob_match("a/**/", "a/b/c/d/", flags::ALL));
+        assert!(glob_match("**/*", "a/b/c/d/a.js", flags::ALL));
+        assert!(glob_match("a/b/**/*.js", "a/b/c/z.js", flags::ALL));
+        assert!(glob_match("a/b/**/*.js", "a/b/z.js", flags::ALL));
+        assert!(glob_match("**/*", "ab", flags::ALL));
+        assert!(glob_match("**/*", "ab/c", flags::ALL));
+        assert!(glob_match("**/*", "ab/c/d", flags::ALL));
+        assert!(glob_match("**/*", "abc.js", flags::ALL));
 
-        assert!(!glob_match("**/", "a", flags::DEFAULT));
-        assert!(!glob_match("**/a/*", "a", flags::DEFAULT));
-        assert!(!glob_match("**/a/*/*", "a", flags::DEFAULT));
-        assert!(!glob_match("*/a/**", "a", flags::DEFAULT));
-        assert!(!glob_match("a/**/*", "a", flags::DEFAULT));
-        assert!(!glob_match("a/**/**/*", "a", flags::DEFAULT));
-        assert!(!glob_match("**/", "a/b", flags::DEFAULT));
-        assert!(!glob_match("**/b/*", "a/b", flags::DEFAULT));
-        assert!(!glob_match("**/b/*/*", "a/b", flags::DEFAULT));
-        assert!(!glob_match("b/**", "a/b", flags::DEFAULT));
-        assert!(!glob_match("**/", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("**/**/b", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("**/b", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("**/b/*/*", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("b/**", "a/b/c", flags::DEFAULT));
-        assert!(!glob_match("**/", "a/b/c/d", flags::DEFAULT));
-        assert!(!glob_match("**/d/*", "a/b/c/d", flags::DEFAULT));
-        assert!(!glob_match("b/**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**", "a", flags::DEFAULT));
-        assert!(glob_match("**/**", "a", flags::DEFAULT));
-        assert!(glob_match("**/**/*", "a", flags::DEFAULT));
-        assert!(glob_match("**/**/a", "a", flags::DEFAULT));
-        assert!(glob_match("**/a", "a", flags::DEFAULT));
-        // assert!(glob_match("**/a/**", "a", flags::DEFAULT));
-        // assert!(glob_match("a/**", "a", flags::DEFAULT));
-        assert!(glob_match("**", "a/b", flags::DEFAULT));
-        assert!(glob_match("**/**", "a/b", flags::DEFAULT));
-        assert!(glob_match("**/**/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("**/**/b", "a/b", flags::DEFAULT));
-        assert!(glob_match("**/b", "a/b", flags::DEFAULT));
-        // assert!(glob_match("**/b/**", "a/b", flags::DEFAULT));
-        // assert!(glob_match("*/b/**", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("a/**/**/*", "a/b", flags::DEFAULT));
-        assert!(glob_match("**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**/**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**/b/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**/b/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("*/b/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("a/**/**/*", "a/b/c", flags::DEFAULT));
-        assert!(glob_match("**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**/**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**/**/*", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**/**/d", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**/b/**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**/b/*/*", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("**/d", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("*/b/**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/**", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/**/*", "a/b/c/d", flags::DEFAULT));
-        assert!(glob_match("a/**/**/*", "a/b/c/d", flags::DEFAULT));
+        assert!(!glob_match("**/", "a", flags::ALL));
+        assert!(!glob_match("**/a/*", "a", flags::ALL));
+        assert!(!glob_match("**/a/*/*", "a", flags::ALL));
+        assert!(!glob_match("*/a/**", "a", flags::ALL));
+        assert!(!glob_match("a/**/*", "a", flags::ALL));
+        assert!(!glob_match("a/**/**/*", "a", flags::ALL));
+        assert!(!glob_match("**/", "a/b", flags::ALL));
+        assert!(!glob_match("**/b/*", "a/b", flags::ALL));
+        assert!(!glob_match("**/b/*/*", "a/b", flags::ALL));
+        assert!(!glob_match("b/**", "a/b", flags::ALL));
+        assert!(!glob_match("**/", "a/b/c", flags::ALL));
+        assert!(!glob_match("**/**/b", "a/b/c", flags::ALL));
+        assert!(!glob_match("**/b", "a/b/c", flags::ALL));
+        assert!(!glob_match("**/b/*/*", "a/b/c", flags::ALL));
+        assert!(!glob_match("b/**", "a/b/c", flags::ALL));
+        assert!(!glob_match("**/", "a/b/c/d", flags::ALL));
+        assert!(!glob_match("**/d/*", "a/b/c/d", flags::ALL));
+        assert!(!glob_match("b/**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**", "a", flags::ALL));
+        assert!(glob_match("**/**", "a", flags::ALL));
+        assert!(glob_match("**/**/*", "a", flags::ALL));
+        assert!(glob_match("**/**/a", "a", flags::ALL));
+        assert!(glob_match("**/a", "a", flags::ALL));
+        // assert!(glob_match("**/a/**", "a", flags::ALL));
+        // assert!(glob_match("a/**", "a", flags::ALL));
+        assert!(glob_match("**", "a/b", flags::ALL));
+        assert!(glob_match("**/**", "a/b", flags::ALL));
+        assert!(glob_match("**/**/*", "a/b", flags::ALL));
+        assert!(glob_match("**/**/b", "a/b", flags::ALL));
+        assert!(glob_match("**/b", "a/b", flags::ALL));
+        // assert!(glob_match("**/b/**", "a/b", flags::ALL));
+        // assert!(glob_match("*/b/**", "a/b", flags::ALL));
+        assert!(glob_match("a/**", "a/b", flags::ALL));
+        assert!(glob_match("a/**/*", "a/b", flags::ALL));
+        assert!(glob_match("a/**/**/*", "a/b", flags::ALL));
+        assert!(glob_match("**", "a/b/c", flags::ALL));
+        assert!(glob_match("**/**", "a/b/c", flags::ALL));
+        assert!(glob_match("**/**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("**/b/*", "a/b/c", flags::ALL));
+        assert!(glob_match("**/b/**", "a/b/c", flags::ALL));
+        assert!(glob_match("*/b/**", "a/b/c", flags::ALL));
+        assert!(glob_match("a/**", "a/b/c", flags::ALL));
+        assert!(glob_match("a/**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("a/**/**/*", "a/b/c", flags::ALL));
+        assert!(glob_match("**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**/**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**/**/*", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**/**/d", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**/b/**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**/b/*/*", "a/b/c/d", flags::ALL));
+        assert!(glob_match("**/d", "a/b/c/d", flags::ALL));
+        assert!(glob_match("*/b/**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/**", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/**/*", "a/b/c/d", flags::ALL));
+        assert!(glob_match("a/**/**/*", "a/b/c/d", flags::ALL));
     }
 
     #[test]
     fn utf8() {
-        assert!(glob_match("フ*/**/*", "フォルダ/aaa.js", flags::DEFAULT));
-        assert!(glob_match("フォ*/**/*", "フォルダ/aaa.js", flags::DEFAULT));
-        assert!(glob_match(
-            "フォル*/**/*",
-            "フォルダ/aaa.js",
-            flags::DEFAULT
-        ));
-        assert!(glob_match("フ*ル*/**/*", "フォルダ/aaa.js", flags::DEFAULT));
-        assert!(glob_match(
-            "フォルダ/**/*",
-            "フォルダ/aaa.js",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("フ*/**/*", "フォルダ/aaa.js", flags::ALL));
+        assert!(glob_match("フォ*/**/*", "フォルダ/aaa.js", flags::ALL));
+        assert!(glob_match("フォル*/**/*", "フォルダ/aaa.js", flags::ALL));
+        assert!(glob_match("フ*ル*/**/*", "フォルダ/aaa.js", flags::ALL));
+        assert!(glob_match("フォルダ/**/*", "フォルダ/aaa.js", flags::ALL));
     }
 
     #[test]
     fn negation() {
-        assert!(!glob_match("!*", "abc", flags::DEFAULT));
-        assert!(!glob_match("!abc", "abc", flags::DEFAULT));
-        assert!(!glob_match("*!.md", "bar.md", flags::DEFAULT));
-        assert!(!glob_match("foo!.md", "bar.md", flags::DEFAULT));
-        assert!(!glob_match("\\!*!*.md", "foo!.md", flags::DEFAULT));
-        assert!(!glob_match("\\!*!*.md", "foo!bar.md", flags::DEFAULT));
-        assert!(glob_match("*!*.md", "!foo!.md", flags::DEFAULT));
-        assert!(glob_match("\\!*!*.md", "!foo!.md", flags::DEFAULT));
-        assert!(glob_match("!*foo", "abc", flags::DEFAULT));
-        assert!(glob_match("!foo*", "abc", flags::DEFAULT));
-        assert!(glob_match("!xyz", "abc", flags::DEFAULT));
-        assert!(glob_match("*!*.*", "ba!r.js", flags::DEFAULT));
-        assert!(glob_match("*.md", "bar.md", flags::DEFAULT));
-        assert!(glob_match("*!*.*", "foo!.md", flags::DEFAULT));
-        assert!(glob_match("*!*.md", "foo!.md", flags::DEFAULT));
-        assert!(glob_match("*!.md", "foo!.md", flags::DEFAULT));
-        assert!(glob_match("*.md", "foo!.md", flags::DEFAULT));
-        assert!(glob_match("foo!.md", "foo!.md", flags::DEFAULT));
-        assert!(glob_match("*!*.md", "foo!bar.md", flags::DEFAULT));
-        assert!(glob_match("*b*.md", "foobar.md", flags::DEFAULT));
+        assert!(!glob_match("!*", "abc", flags::ALL));
+        assert!(!glob_match("!abc", "abc", flags::ALL));
+        assert!(!glob_match("*!.md", "bar.md", flags::ALL));
+        assert!(!glob_match("foo!.md", "bar.md", flags::ALL));
+        assert!(!glob_match("\\!*!*.md", "foo!.md", flags::ALL));
+        assert!(!glob_match("\\!*!*.md", "foo!bar.md", flags::ALL));
+        assert!(glob_match("*!*.md", "!foo!.md", flags::ALL));
+        assert!(glob_match("\\!*!*.md", "!foo!.md", flags::ALL));
+        assert!(glob_match("!*foo", "abc", flags::ALL));
+        assert!(glob_match("!foo*", "abc", flags::ALL));
+        assert!(glob_match("!xyz", "abc", flags::ALL));
+        assert!(glob_match("*!*.*", "ba!r.js", flags::ALL));
+        assert!(glob_match("*.md", "bar.md", flags::ALL));
+        assert!(glob_match("*!*.*", "foo!.md", flags::ALL));
+        assert!(glob_match("*!*.md", "foo!.md", flags::ALL));
+        assert!(glob_match("*!.md", "foo!.md", flags::ALL));
+        assert!(glob_match("*.md", "foo!.md", flags::ALL));
+        assert!(glob_match("foo!.md", "foo!.md", flags::ALL));
+        assert!(glob_match("*!*.md", "foo!bar.md", flags::ALL));
+        assert!(glob_match("*b*.md", "foobar.md", flags::ALL));
 
-        assert!(!glob_match("a!!b", "a", flags::DEFAULT));
-        assert!(!glob_match("a!!b", "aa", flags::DEFAULT));
-        assert!(!glob_match("a!!b", "a/b", flags::DEFAULT));
-        assert!(!glob_match("a!!b", "a!b", flags::DEFAULT));
-        assert!(glob_match("a!!b", "a!!b", flags::DEFAULT));
-        assert!(!glob_match("a!!b", "a/!!/b", flags::DEFAULT));
+        assert!(!glob_match("a!!b", "a", flags::ALL));
+        assert!(!glob_match("a!!b", "aa", flags::ALL));
+        assert!(!glob_match("a!!b", "a/b", flags::ALL));
+        assert!(!glob_match("a!!b", "a!b", flags::ALL));
+        assert!(glob_match("a!!b", "a!!b", flags::ALL));
+        assert!(!glob_match("a!!b", "a/!!/b", flags::ALL));
 
-        assert!(!glob_match("!a/b", "a/b", flags::DEFAULT));
-        assert!(glob_match("!a/b", "a", flags::DEFAULT));
-        assert!(glob_match("!a/b", "a.b", flags::DEFAULT));
-        assert!(glob_match("!a/b", "a/a", flags::DEFAULT));
-        assert!(glob_match("!a/b", "a/c", flags::DEFAULT));
-        assert!(glob_match("!a/b", "b/a", flags::DEFAULT));
-        assert!(glob_match("!a/b", "b/b", flags::DEFAULT));
-        assert!(glob_match("!a/b", "b/c", flags::DEFAULT));
+        assert!(!glob_match("!a/b", "a/b", flags::ALL));
+        assert!(glob_match("!a/b", "a", flags::ALL));
+        assert!(glob_match("!a/b", "a.b", flags::ALL));
+        assert!(glob_match("!a/b", "a/a", flags::ALL));
+        assert!(glob_match("!a/b", "a/c", flags::ALL));
+        assert!(glob_match("!a/b", "b/a", flags::ALL));
+        assert!(glob_match("!a/b", "b/b", flags::ALL));
+        assert!(glob_match("!a/b", "b/c", flags::ALL));
 
-        assert!(!glob_match("!abc", "abc", flags::DEFAULT));
-        assert!(glob_match("!!abc", "abc", flags::DEFAULT));
-        assert!(!glob_match("!!!abc", "abc", flags::DEFAULT));
-        assert!(glob_match("!!!!abc", "abc", flags::DEFAULT));
-        assert!(!glob_match("!!!!!abc", "abc", flags::DEFAULT));
-        assert!(glob_match("!!!!!!abc", "abc", flags::DEFAULT));
-        assert!(!glob_match("!!!!!!!abc", "abc", flags::DEFAULT));
-        assert!(glob_match("!!!!!!!!abc", "abc", flags::DEFAULT));
+        assert!(!glob_match("!abc", "abc", flags::ALL));
+        assert!(glob_match("!!abc", "abc", flags::ALL));
+        assert!(!glob_match("!!!abc", "abc", flags::ALL));
+        assert!(glob_match("!!!!abc", "abc", flags::ALL));
+        assert!(!glob_match("!!!!!abc", "abc", flags::ALL));
+        assert!(glob_match("!!!!!!abc", "abc", flags::ALL));
+        assert!(!glob_match("!!!!!!!abc", "abc", flags::ALL));
+        assert!(glob_match("!!!!!!!!abc", "abc", flags::ALL));
 
-        // assert!(!glob_match("!(*/*)", "a/a", flags::DEFAULT));
-        // assert!(!glob_match("!(*/*)", "a/b", flags::DEFAULT));
-        // assert!(!glob_match("!(*/*)", "a/c", flags::DEFAULT));
-        // assert!(!glob_match("!(*/*)", "b/a", flags::DEFAULT));
-        // assert!(!glob_match("!(*/*)", "b/b", flags::DEFAULT));
-        // assert!(!glob_match("!(*/*)", "b/c", flags::DEFAULT));
-        // assert!(!glob_match("!(*/b)", "a/b", flags::DEFAULT));
-        // assert!(!glob_match("!(*/b)", "b/b", flags::DEFAULT));
-        // assert!(!glob_match("!(a/b)", "a/b", flags::DEFAULT));
-        assert!(!glob_match("!*", "a", flags::DEFAULT));
-        assert!(!glob_match("!*", "a.b", flags::DEFAULT));
-        assert!(!glob_match("!*/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("!*/*", "a/b", flags::DEFAULT));
-        assert!(!glob_match("!*/*", "a/c", flags::DEFAULT));
-        assert!(!glob_match("!*/*", "b/a", flags::DEFAULT));
-        assert!(!glob_match("!*/*", "b/b", flags::DEFAULT));
-        assert!(!glob_match("!*/*", "b/c", flags::DEFAULT));
-        assert!(!glob_match("!*/b", "a/b", flags::DEFAULT));
-        assert!(!glob_match("!*/b", "b/b", flags::DEFAULT));
-        assert!(!glob_match("!*/c", "a/c", flags::DEFAULT));
-        assert!(!glob_match("!*/c", "a/c", flags::DEFAULT));
-        assert!(!glob_match("!*/c", "b/c", flags::DEFAULT));
-        assert!(!glob_match("!*/c", "b/c", flags::DEFAULT));
-        assert!(!glob_match("!*a*", "bar", flags::DEFAULT));
-        assert!(!glob_match("!*a*", "fab", flags::DEFAULT));
-        // assert!(!glob_match("!a/(*)", "a/a", flags::DEFAULT));
-        // assert!(!glob_match("!a/(*)", "a/b", flags::DEFAULT));
-        // assert!(!glob_match("!a/(*)", "a/c", flags::DEFAULT));
-        // assert!(!glob_match("!a/(b)", "a/b", flags::DEFAULT));
-        assert!(!glob_match("!a/*", "a/a", flags::DEFAULT));
-        assert!(!glob_match("!a/*", "a/b", flags::DEFAULT));
-        assert!(!glob_match("!a/*", "a/c", flags::DEFAULT));
-        assert!(!glob_match("!f*b", "fab", flags::DEFAULT));
-        // assert!(glob_match("!(*/*)", "a", flags::DEFAULT));
-        // assert!(glob_match("!(*/*)", "a.b", flags::DEFAULT));
-        // assert!(glob_match("!(*/b)", "a", flags::DEFAULT));
-        // assert!(glob_match("!(*/b)", "a.b", flags::DEFAULT));
-        // assert!(glob_match("!(*/b)", "a/a", flags::DEFAULT));
-        // assert!(glob_match("!(*/b)", "a/c", flags::DEFAULT));
-        // assert!(glob_match("!(*/b)", "b/a", flags::DEFAULT));
-        // assert!(glob_match("!(*/b)", "b/c", flags::DEFAULT));
-        // assert!(glob_match("!(a/b)", "a", flags::DEFAULT));
-        // assert!(glob_match("!(a/b)", "a.b", flags::DEFAULT));
-        // assert!(glob_match("!(a/b)", "a/a", flags::DEFAULT));
-        // assert!(glob_match("!(a/b)", "a/c", flags::DEFAULT));
-        // assert!(glob_match("!(a/b)", "b/a", flags::DEFAULT));
-        // assert!(glob_match("!(a/b)", "b/b", flags::DEFAULT));
-        // assert!(glob_match("!(a/b)", "b/c", flags::DEFAULT));
-        assert!(glob_match("!*", "a/a", flags::DEFAULT));
-        assert!(glob_match("!*", "a/b", flags::DEFAULT));
-        assert!(glob_match("!*", "a/c", flags::DEFAULT));
-        assert!(glob_match("!*", "b/a", flags::DEFAULT));
-        assert!(glob_match("!*", "b/b", flags::DEFAULT));
-        assert!(glob_match("!*", "b/c", flags::DEFAULT));
-        assert!(glob_match("!*/*", "a", flags::DEFAULT));
-        assert!(glob_match("!*/*", "a.b", flags::DEFAULT));
-        assert!(glob_match("!*/b", "a", flags::DEFAULT));
-        assert!(glob_match("!*/b", "a.b", flags::DEFAULT));
-        assert!(glob_match("!*/b", "a/a", flags::DEFAULT));
-        assert!(glob_match("!*/b", "a/c", flags::DEFAULT));
-        assert!(glob_match("!*/b", "b/a", flags::DEFAULT));
-        assert!(glob_match("!*/b", "b/c", flags::DEFAULT));
-        assert!(glob_match("!*/c", "a", flags::DEFAULT));
-        assert!(glob_match("!*/c", "a.b", flags::DEFAULT));
-        assert!(glob_match("!*/c", "a/a", flags::DEFAULT));
-        assert!(glob_match("!*/c", "a/b", flags::DEFAULT));
-        assert!(glob_match("!*/c", "b/a", flags::DEFAULT));
-        assert!(glob_match("!*/c", "b/b", flags::DEFAULT));
-        assert!(glob_match("!*a*", "foo", flags::DEFAULT));
-        // assert!(glob_match("!a/(*)", "a", flags::DEFAULT));
-        // assert!(glob_match("!a/(*)", "a.b", flags::DEFAULT));
-        // assert!(glob_match("!a/(*)", "b/a", flags::DEFAULT));
-        // assert!(glob_match("!a/(*)", "b/b", flags::DEFAULT));
-        // assert!(glob_match("!a/(*)", "b/c", flags::DEFAULT));
-        // assert!(glob_match("!a/(b)", "a", flags::DEFAULT));
-        // assert!(glob_match("!a/(b)", "a.b", flags::DEFAULT));
-        // assert!(glob_match("!a/(b)", "a/a", flags::DEFAULT));
-        // assert!(glob_match("!a/(b)", "a/c", flags::DEFAULT));
-        // assert!(glob_match("!a/(b)", "b/a", flags::DEFAULT));
-        // assert!(glob_match("!a/(b)", "b/b", flags::DEFAULT));
-        // assert!(glob_match("!a/(b)", "b/c", flags::DEFAULT));
-        assert!(glob_match("!a/*", "a", flags::DEFAULT));
-        assert!(glob_match("!a/*", "a.b", flags::DEFAULT));
-        assert!(glob_match("!a/*", "b/a", flags::DEFAULT));
-        assert!(glob_match("!a/*", "b/b", flags::DEFAULT));
-        assert!(glob_match("!a/*", "b/c", flags::DEFAULT));
-        assert!(glob_match("!f*b", "bar", flags::DEFAULT));
-        assert!(glob_match("!f*b", "foo", flags::DEFAULT));
+        // assert!(!glob_match("!(*/*)", "a/a", flags::ALL));
+        // assert!(!glob_match("!(*/*)", "a/b", flags::ALL));
+        // assert!(!glob_match("!(*/*)", "a/c", flags::ALL));
+        // assert!(!glob_match("!(*/*)", "b/a", flags::ALL));
+        // assert!(!glob_match("!(*/*)", "b/b", flags::ALL));
+        // assert!(!glob_match("!(*/*)", "b/c", flags::ALL));
+        // assert!(!glob_match("!(*/b)", "a/b", flags::ALL));
+        // assert!(!glob_match("!(*/b)", "b/b", flags::ALL));
+        // assert!(!glob_match("!(a/b)", "a/b", flags::ALL));
+        assert!(!glob_match("!*", "a", flags::ALL));
+        assert!(!glob_match("!*", "a.b", flags::ALL));
+        assert!(!glob_match("!*/*", "a/a", flags::ALL));
+        assert!(!glob_match("!*/*", "a/b", flags::ALL));
+        assert!(!glob_match("!*/*", "a/c", flags::ALL));
+        assert!(!glob_match("!*/*", "b/a", flags::ALL));
+        assert!(!glob_match("!*/*", "b/b", flags::ALL));
+        assert!(!glob_match("!*/*", "b/c", flags::ALL));
+        assert!(!glob_match("!*/b", "a/b", flags::ALL));
+        assert!(!glob_match("!*/b", "b/b", flags::ALL));
+        assert!(!glob_match("!*/c", "a/c", flags::ALL));
+        assert!(!glob_match("!*/c", "a/c", flags::ALL));
+        assert!(!glob_match("!*/c", "b/c", flags::ALL));
+        assert!(!glob_match("!*/c", "b/c", flags::ALL));
+        assert!(!glob_match("!*a*", "bar", flags::ALL));
+        assert!(!glob_match("!*a*", "fab", flags::ALL));
+        // assert!(!glob_match("!a/(*)", "a/a", flags::ALL));
+        // assert!(!glob_match("!a/(*)", "a/b", flags::ALL));
+        // assert!(!glob_match("!a/(*)", "a/c", flags::ALL));
+        // assert!(!glob_match("!a/(b)", "a/b", flags::ALL));
+        assert!(!glob_match("!a/*", "a/a", flags::ALL));
+        assert!(!glob_match("!a/*", "a/b", flags::ALL));
+        assert!(!glob_match("!a/*", "a/c", flags::ALL));
+        assert!(!glob_match("!f*b", "fab", flags::ALL));
+        // assert!(glob_match("!(*/*)", "a", flags::ALL));
+        // assert!(glob_match("!(*/*)", "a.b", flags::ALL));
+        // assert!(glob_match("!(*/b)", "a", flags::ALL));
+        // assert!(glob_match("!(*/b)", "a.b", flags::ALL));
+        // assert!(glob_match("!(*/b)", "a/a", flags::ALL));
+        // assert!(glob_match("!(*/b)", "a/c", flags::ALL));
+        // assert!(glob_match("!(*/b)", "b/a", flags::ALL));
+        // assert!(glob_match("!(*/b)", "b/c", flags::ALL));
+        // assert!(glob_match("!(a/b)", "a", flags::ALL));
+        // assert!(glob_match("!(a/b)", "a.b", flags::ALL));
+        // assert!(glob_match("!(a/b)", "a/a", flags::ALL));
+        // assert!(glob_match("!(a/b)", "a/c", flags::ALL));
+        // assert!(glob_match("!(a/b)", "b/a", flags::ALL));
+        // assert!(glob_match("!(a/b)", "b/b", flags::ALL));
+        // assert!(glob_match("!(a/b)", "b/c", flags::ALL));
+        assert!(glob_match("!*", "a/a", flags::ALL));
+        assert!(glob_match("!*", "a/b", flags::ALL));
+        assert!(glob_match("!*", "a/c", flags::ALL));
+        assert!(glob_match("!*", "b/a", flags::ALL));
+        assert!(glob_match("!*", "b/b", flags::ALL));
+        assert!(glob_match("!*", "b/c", flags::ALL));
+        assert!(glob_match("!*/*", "a", flags::ALL));
+        assert!(glob_match("!*/*", "a.b", flags::ALL));
+        assert!(glob_match("!*/b", "a", flags::ALL));
+        assert!(glob_match("!*/b", "a.b", flags::ALL));
+        assert!(glob_match("!*/b", "a/a", flags::ALL));
+        assert!(glob_match("!*/b", "a/c", flags::ALL));
+        assert!(glob_match("!*/b", "b/a", flags::ALL));
+        assert!(glob_match("!*/b", "b/c", flags::ALL));
+        assert!(glob_match("!*/c", "a", flags::ALL));
+        assert!(glob_match("!*/c", "a.b", flags::ALL));
+        assert!(glob_match("!*/c", "a/a", flags::ALL));
+        assert!(glob_match("!*/c", "a/b", flags::ALL));
+        assert!(glob_match("!*/c", "b/a", flags::ALL));
+        assert!(glob_match("!*/c", "b/b", flags::ALL));
+        assert!(glob_match("!*a*", "foo", flags::ALL));
+        // assert!(glob_match("!a/(*)", "a", flags::ALL));
+        // assert!(glob_match("!a/(*)", "a.b", flags::ALL));
+        // assert!(glob_match("!a/(*)", "b/a", flags::ALL));
+        // assert!(glob_match("!a/(*)", "b/b", flags::ALL));
+        // assert!(glob_match("!a/(*)", "b/c", flags::ALL));
+        // assert!(glob_match("!a/(b)", "a", flags::ALL));
+        // assert!(glob_match("!a/(b)", "a.b", flags::ALL));
+        // assert!(glob_match("!a/(b)", "a/a", flags::ALL));
+        // assert!(glob_match("!a/(b)", "a/c", flags::ALL));
+        // assert!(glob_match("!a/(b)", "b/a", flags::ALL));
+        // assert!(glob_match("!a/(b)", "b/b", flags::ALL));
+        // assert!(glob_match("!a/(b)", "b/c", flags::ALL));
+        assert!(glob_match("!a/*", "a", flags::ALL));
+        assert!(glob_match("!a/*", "a.b", flags::ALL));
+        assert!(glob_match("!a/*", "b/a", flags::ALL));
+        assert!(glob_match("!a/*", "b/b", flags::ALL));
+        assert!(glob_match("!a/*", "b/c", flags::ALL));
+        assert!(glob_match("!f*b", "bar", flags::ALL));
+        assert!(glob_match("!f*b", "foo", flags::ALL));
 
-        assert!(!glob_match("!.md", ".md", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "a.js", flags::DEFAULT));
-        // assert!(!glob_match("!**/*.md", "b.md", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "c.txt", flags::DEFAULT));
-        assert!(glob_match("!*.md", "a.js", flags::DEFAULT));
-        assert!(!glob_match("!*.md", "b.md", flags::DEFAULT));
-        assert!(glob_match("!*.md", "c.txt", flags::DEFAULT));
-        assert!(!glob_match("!*.md", "abc.md", flags::DEFAULT));
-        assert!(glob_match("!*.md", "abc.txt", flags::DEFAULT));
-        assert!(!glob_match("!*.md", "foo.md", flags::DEFAULT));
-        assert!(glob_match("!.md", "foo.md", flags::DEFAULT));
+        assert!(!glob_match("!.md", ".md", flags::ALL));
+        assert!(glob_match("!**/*.md", "a.js", flags::ALL));
+        // assert!(!glob_match("!**/*.md", "b.md", flags::ALL));
+        assert!(glob_match("!**/*.md", "c.txt", flags::ALL));
+        assert!(glob_match("!*.md", "a.js", flags::ALL));
+        assert!(!glob_match("!*.md", "b.md", flags::ALL));
+        assert!(glob_match("!*.md", "c.txt", flags::ALL));
+        assert!(!glob_match("!*.md", "abc.md", flags::ALL));
+        assert!(glob_match("!*.md", "abc.txt", flags::ALL));
+        assert!(!glob_match("!*.md", "foo.md", flags::ALL));
+        assert!(glob_match("!.md", "foo.md", flags::ALL));
 
-        assert!(glob_match("!*.md", "a.js", flags::DEFAULT));
-        assert!(glob_match("!*.md", "b.txt", flags::DEFAULT));
-        assert!(!glob_match("!*.md", "c.md", flags::DEFAULT));
-        assert!(!glob_match("!a/*/a.js", "a/a/a.js", flags::DEFAULT));
-        assert!(!glob_match("!a/*/a.js", "a/b/a.js", flags::DEFAULT));
-        assert!(!glob_match("!a/*/a.js", "a/c/a.js", flags::DEFAULT));
-        assert!(!glob_match("!a/*/*/a.js", "a/a/a/a.js", flags::DEFAULT));
-        assert!(glob_match("!a/*/*/a.js", "b/a/b/a.js", flags::DEFAULT));
-        assert!(glob_match("!a/*/*/a.js", "c/a/c/a.js", flags::DEFAULT));
-        assert!(!glob_match("!a/a*.txt", "a/a.txt", flags::DEFAULT));
-        assert!(glob_match("!a/a*.txt", "a/b.txt", flags::DEFAULT));
-        assert!(glob_match("!a/a*.txt", "a/c.txt", flags::DEFAULT));
-        assert!(!glob_match("!a.a*.txt", "a.a.txt", flags::DEFAULT));
-        assert!(glob_match("!a.a*.txt", "a.b.txt", flags::DEFAULT));
-        assert!(glob_match("!a.a*.txt", "a.c.txt", flags::DEFAULT));
-        assert!(!glob_match("!a/*.txt", "a/a.txt", flags::DEFAULT));
-        assert!(!glob_match("!a/*.txt", "a/b.txt", flags::DEFAULT));
-        assert!(!glob_match("!a/*.txt", "a/c.txt", flags::DEFAULT));
+        assert!(glob_match("!*.md", "a.js", flags::ALL));
+        assert!(glob_match("!*.md", "b.txt", flags::ALL));
+        assert!(!glob_match("!*.md", "c.md", flags::ALL));
+        assert!(!glob_match("!a/*/a.js", "a/a/a.js", flags::ALL));
+        assert!(!glob_match("!a/*/a.js", "a/b/a.js", flags::ALL));
+        assert!(!glob_match("!a/*/a.js", "a/c/a.js", flags::ALL));
+        assert!(!glob_match("!a/*/*/a.js", "a/a/a/a.js", flags::ALL));
+        assert!(glob_match("!a/*/*/a.js", "b/a/b/a.js", flags::ALL));
+        assert!(glob_match("!a/*/*/a.js", "c/a/c/a.js", flags::ALL));
+        assert!(!glob_match("!a/a*.txt", "a/a.txt", flags::ALL));
+        assert!(glob_match("!a/a*.txt", "a/b.txt", flags::ALL));
+        assert!(glob_match("!a/a*.txt", "a/c.txt", flags::ALL));
+        assert!(!glob_match("!a.a*.txt", "a.a.txt", flags::ALL));
+        assert!(glob_match("!a.a*.txt", "a.b.txt", flags::ALL));
+        assert!(glob_match("!a.a*.txt", "a.c.txt", flags::ALL));
+        assert!(!glob_match("!a/*.txt", "a/a.txt", flags::ALL));
+        assert!(!glob_match("!a/*.txt", "a/b.txt", flags::ALL));
+        assert!(!glob_match("!a/*.txt", "a/c.txt", flags::ALL));
 
-        assert!(glob_match("!*.md", "a.js", flags::DEFAULT));
-        assert!(glob_match("!*.md", "b.txt", flags::DEFAULT));
-        assert!(!glob_match("!*.md", "c.md", flags::DEFAULT));
-        // assert!(!glob_match("!**/a.js", "a/a/a.js", flags::DEFAULT));
-        // assert!(!glob_match("!**/a.js", "a/b/a.js", flags::DEFAULT));
-        // assert!(!glob_match("!**/a.js", "a/c/a.js", flags::DEFAULT));
-        assert!(glob_match("!**/a.js", "a/a/b.js", flags::DEFAULT));
-        assert!(!glob_match("!a/**/a.js", "a/a/a/a.js", flags::DEFAULT));
-        assert!(glob_match("!a/**/a.js", "b/a/b/a.js", flags::DEFAULT));
-        assert!(glob_match("!a/**/a.js", "c/a/c/a.js", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "a/b.js", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "a.js", flags::DEFAULT));
-        assert!(!glob_match("!**/*.md", "a/b.md", flags::DEFAULT));
-        // assert!(!glob_match("!**/*.md", "a.md", flags::DEFAULT));
-        assert!(!glob_match("**/*.md", "a/b.js", flags::DEFAULT));
-        assert!(!glob_match("**/*.md", "a.js", flags::DEFAULT));
-        assert!(glob_match("**/*.md", "a/b.md", flags::DEFAULT));
-        assert!(glob_match("**/*.md", "a.md", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "a/b.js", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "a.js", flags::DEFAULT));
-        assert!(!glob_match("!**/*.md", "a/b.md", flags::DEFAULT));
-        // assert!(!glob_match("!**/*.md", "a.md", flags::DEFAULT));
-        assert!(glob_match("!*.md", "a/b.js", flags::DEFAULT));
-        assert!(glob_match("!*.md", "a.js", flags::DEFAULT));
-        assert!(glob_match("!*.md", "a/b.md", flags::DEFAULT));
-        assert!(!glob_match("!*.md", "a.md", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "a.js", flags::DEFAULT));
-        // assert!(!glob_match("!**/*.md", "b.md", flags::DEFAULT));
-        assert!(glob_match("!**/*.md", "c.txt", flags::DEFAULT));
+        assert!(glob_match("!*.md", "a.js", flags::ALL));
+        assert!(glob_match("!*.md", "b.txt", flags::ALL));
+        assert!(!glob_match("!*.md", "c.md", flags::ALL));
+        // assert!(!glob_match("!**/a.js", "a/a/a.js", flags::ALL));
+        // assert!(!glob_match("!**/a.js", "a/b/a.js", flags::ALL));
+        // assert!(!glob_match("!**/a.js", "a/c/a.js", flags::ALL));
+        assert!(glob_match("!**/a.js", "a/a/b.js", flags::ALL));
+        assert!(!glob_match("!a/**/a.js", "a/a/a/a.js", flags::ALL));
+        assert!(glob_match("!a/**/a.js", "b/a/b/a.js", flags::ALL));
+        assert!(glob_match("!a/**/a.js", "c/a/c/a.js", flags::ALL));
+        assert!(glob_match("!**/*.md", "a/b.js", flags::ALL));
+        assert!(glob_match("!**/*.md", "a.js", flags::ALL));
+        assert!(!glob_match("!**/*.md", "a/b.md", flags::ALL));
+        // assert!(!glob_match("!**/*.md", "a.md", flags::ALL));
+        assert!(!glob_match("**/*.md", "a/b.js", flags::ALL));
+        assert!(!glob_match("**/*.md", "a.js", flags::ALL));
+        assert!(glob_match("**/*.md", "a/b.md", flags::ALL));
+        assert!(glob_match("**/*.md", "a.md", flags::ALL));
+        assert!(glob_match("!**/*.md", "a/b.js", flags::ALL));
+        assert!(glob_match("!**/*.md", "a.js", flags::ALL));
+        assert!(!glob_match("!**/*.md", "a/b.md", flags::ALL));
+        // assert!(!glob_match("!**/*.md", "a.md", flags::ALL));
+        assert!(glob_match("!*.md", "a/b.js", flags::ALL));
+        assert!(glob_match("!*.md", "a.js", flags::ALL));
+        assert!(glob_match("!*.md", "a/b.md", flags::ALL));
+        assert!(!glob_match("!*.md", "a.md", flags::ALL));
+        assert!(glob_match("!**/*.md", "a.js", flags::ALL));
+        // assert!(!glob_match("!**/*.md", "b.md", flags::ALL));
+        assert!(glob_match("!**/*.md", "c.txt", flags::ALL));
     }
 
     #[test]
     fn question_mark() {
-        assert!(glob_match("?", "a", flags::DEFAULT));
-        assert!(!glob_match("?", "aa", flags::DEFAULT));
-        assert!(!glob_match("?", "ab", flags::DEFAULT));
-        assert!(!glob_match("?", "aaa", flags::DEFAULT));
-        assert!(!glob_match("?", "abcdefg", flags::DEFAULT));
+        assert!(glob_match("?", "a", flags::ALL));
+        assert!(!glob_match("?", "aa", flags::ALL));
+        assert!(!glob_match("?", "ab", flags::ALL));
+        assert!(!glob_match("?", "aaa", flags::ALL));
+        assert!(!glob_match("?", "abcdefg", flags::ALL));
 
-        assert!(!glob_match("??", "a", flags::DEFAULT));
-        assert!(glob_match("??", "aa", flags::DEFAULT));
-        assert!(glob_match("??", "ab", flags::DEFAULT));
-        assert!(!glob_match("??", "aaa", flags::DEFAULT));
-        assert!(!glob_match("??", "abcdefg", flags::DEFAULT));
+        assert!(!glob_match("??", "a", flags::ALL));
+        assert!(glob_match("??", "aa", flags::ALL));
+        assert!(glob_match("??", "ab", flags::ALL));
+        assert!(!glob_match("??", "aaa", flags::ALL));
+        assert!(!glob_match("??", "abcdefg", flags::ALL));
 
-        assert!(!glob_match("???", "a", flags::DEFAULT));
-        assert!(!glob_match("???", "aa", flags::DEFAULT));
-        assert!(!glob_match("???", "ab", flags::DEFAULT));
-        assert!(glob_match("???", "aaa", flags::DEFAULT));
-        assert!(!glob_match("???", "abcdefg", flags::DEFAULT));
+        assert!(!glob_match("???", "a", flags::ALL));
+        assert!(!glob_match("???", "aa", flags::ALL));
+        assert!(!glob_match("???", "ab", flags::ALL));
+        assert!(glob_match("???", "aaa", flags::ALL));
+        assert!(!glob_match("???", "abcdefg", flags::ALL));
 
-        assert!(!glob_match("a?c", "aaa", flags::DEFAULT));
-        assert!(glob_match("a?c", "aac", flags::DEFAULT));
-        assert!(glob_match("a?c", "abc", flags::DEFAULT));
-        assert!(!glob_match("ab?", "a", flags::DEFAULT));
-        assert!(!glob_match("ab?", "aa", flags::DEFAULT));
-        assert!(!glob_match("ab?", "ab", flags::DEFAULT));
-        assert!(!glob_match("ab?", "ac", flags::DEFAULT));
-        assert!(!glob_match("ab?", "abcd", flags::DEFAULT));
-        assert!(!glob_match("ab?", "abbb", flags::DEFAULT));
-        assert!(glob_match("a?b", "acb", flags::DEFAULT));
+        assert!(!glob_match("a?c", "aaa", flags::ALL));
+        assert!(glob_match("a?c", "aac", flags::ALL));
+        assert!(glob_match("a?c", "abc", flags::ALL));
+        assert!(!glob_match("ab?", "a", flags::ALL));
+        assert!(!glob_match("ab?", "aa", flags::ALL));
+        assert!(!glob_match("ab?", "ab", flags::ALL));
+        assert!(!glob_match("ab?", "ac", flags::ALL));
+        assert!(!glob_match("ab?", "abcd", flags::ALL));
+        assert!(!glob_match("ab?", "abbb", flags::ALL));
+        assert!(glob_match("a?b", "acb", flags::ALL));
 
-        assert!(!glob_match(
-            "a/?/c/?/e.md",
-            "a/bb/c/dd/e.md",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a/??/c/??/e.md",
-            "a/bb/c/dd/e.md",
-            flags::DEFAULT
-        ));
-        assert!(!glob_match("a/??/c.md", "a/bbb/c.md", flags::DEFAULT));
-        assert!(glob_match("a/?/c.md", "a/b/c.md", flags::DEFAULT));
-        assert!(glob_match("a/?/c/?/e.md", "a/b/c/d/e.md", flags::DEFAULT));
-        assert!(!glob_match(
-            "a/?/c/???/e.md",
-            "a/b/c/d/e.md",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a/?/c/???/e.md",
-            "a/b/c/zzz/e.md",
-            flags::DEFAULT
-        ));
-        assert!(!glob_match("a/?/c.md", "a/bb/c.md", flags::DEFAULT));
-        assert!(glob_match("a/??/c.md", "a/bb/c.md", flags::DEFAULT));
-        assert!(glob_match("a/???/c.md", "a/bbb/c.md", flags::DEFAULT));
-        assert!(glob_match("a/????/c.md", "a/bbbb/c.md", flags::DEFAULT));
+        assert!(!glob_match("a/?/c/?/e.md", "a/bb/c/dd/e.md", flags::ALL));
+        assert!(glob_match("a/??/c/??/e.md", "a/bb/c/dd/e.md", flags::ALL));
+        assert!(!glob_match("a/??/c.md", "a/bbb/c.md", flags::ALL));
+        assert!(glob_match("a/?/c.md", "a/b/c.md", flags::ALL));
+        assert!(glob_match("a/?/c/?/e.md", "a/b/c/d/e.md", flags::ALL));
+        assert!(!glob_match("a/?/c/???/e.md", "a/b/c/d/e.md", flags::ALL));
+        assert!(glob_match("a/?/c/???/e.md", "a/b/c/zzz/e.md", flags::ALL));
+        assert!(!glob_match("a/?/c.md", "a/bb/c.md", flags::ALL));
+        assert!(glob_match("a/??/c.md", "a/bb/c.md", flags::ALL));
+        assert!(glob_match("a/???/c.md", "a/bbb/c.md", flags::ALL));
+        assert!(glob_match("a/????/c.md", "a/bbbb/c.md", flags::ALL));
     }
 
     #[test]
     fn braces() {
-        assert!(glob_match("{a,b,c}", "a", flags::DEFAULT));
-        assert!(glob_match("{a,b,c}", "b", flags::DEFAULT));
-        assert!(glob_match("{a,b,c}", "c", flags::DEFAULT));
-        assert!(!glob_match("{a,b,c}", "aa", flags::DEFAULT));
-        assert!(!glob_match("{a,b,c}", "bb", flags::DEFAULT));
-        assert!(!glob_match("{a,b,c}", "cc", flags::DEFAULT));
+        assert!(glob_match("{a,b,c}", "a", flags::ALL));
+        assert!(glob_match("{a,b,c}", "b", flags::ALL));
+        assert!(glob_match("{a,b,c}", "c", flags::ALL));
+        assert!(!glob_match("{a,b,c}", "aa", flags::ALL));
+        assert!(!glob_match("{a,b,c}", "bb", flags::ALL));
+        assert!(!glob_match("{a,b,c}", "cc", flags::ALL));
 
-        assert!(glob_match("a/{a,b}", "a/a", flags::DEFAULT));
-        assert!(glob_match("a/{a,b}", "a/b", flags::DEFAULT));
-        assert!(!glob_match("a/{a,b}", "a/c", flags::DEFAULT));
-        assert!(!glob_match("a/{a,b}", "b/b", flags::DEFAULT));
-        assert!(!glob_match("a/{a,b,c}", "b/b", flags::DEFAULT));
-        assert!(glob_match("a/{a,b,c}", "a/c", flags::DEFAULT));
-        assert!(glob_match("a{b,bc}.txt", "abc.txt", flags::DEFAULT));
+        assert!(glob_match("a/{a,b}", "a/a", flags::ALL));
+        assert!(glob_match("a/{a,b}", "a/b", flags::ALL));
+        assert!(!glob_match("a/{a,b}", "a/c", flags::ALL));
+        assert!(!glob_match("a/{a,b}", "b/b", flags::ALL));
+        assert!(!glob_match("a/{a,b,c}", "b/b", flags::ALL));
+        assert!(glob_match("a/{a,b,c}", "a/c", flags::ALL));
+        assert!(glob_match("a{b,bc}.txt", "abc.txt", flags::ALL));
 
-        assert!(glob_match("foo[{a,b}]baz", "foo{baz", flags::DEFAULT));
+        assert!(glob_match("foo[{a,b}]baz", "foo{baz", flags::ALL));
 
-        assert!(!glob_match("a{,b}.txt", "abc.txt", flags::DEFAULT));
-        assert!(!glob_match("a{a,b,}.txt", "abc.txt", flags::DEFAULT));
-        assert!(!glob_match("a{b,}.txt", "abc.txt", flags::DEFAULT));
-        assert!(glob_match("a{,b}.txt", "a.txt", flags::DEFAULT));
-        assert!(glob_match("a{b,}.txt", "a.txt", flags::DEFAULT));
-        assert!(glob_match("a{a,b,}.txt", "aa.txt", flags::DEFAULT));
-        assert!(glob_match("a{a,b,}.txt", "aa.txt", flags::DEFAULT));
-        assert!(glob_match("a{,b}.txt", "ab.txt", flags::DEFAULT));
-        assert!(glob_match("a{b,}.txt", "ab.txt", flags::DEFAULT));
+        assert!(!glob_match("a{,b}.txt", "abc.txt", flags::ALL));
+        assert!(!glob_match("a{a,b,}.txt", "abc.txt", flags::ALL));
+        assert!(!glob_match("a{b,}.txt", "abc.txt", flags::ALL));
+        assert!(glob_match("a{,b}.txt", "a.txt", flags::ALL));
+        assert!(glob_match("a{b,}.txt", "a.txt", flags::ALL));
+        assert!(glob_match("a{a,b,}.txt", "aa.txt", flags::ALL));
+        assert!(glob_match("a{a,b,}.txt", "aa.txt", flags::ALL));
+        assert!(glob_match("a{,b}.txt", "ab.txt", flags::ALL));
+        assert!(glob_match("a{b,}.txt", "ab.txt", flags::ALL));
 
-        // assert!(glob_match("{a/,}a/**", "a", flags::DEFAULT));
-        assert!(glob_match("a{a,b/}*.txt", "aa.txt", flags::DEFAULT));
-        assert!(glob_match("a{a,b/}*.txt", "ab/.txt", flags::DEFAULT));
-        assert!(glob_match("a{a,b/}*.txt", "ab/a.txt", flags::DEFAULT));
-        // assert!(glob_match("{a/,}a/**", "a/", flags::DEFAULT));
-        assert!(glob_match("{a/,}a/**", "a/a/", flags::DEFAULT));
-        // assert!(glob_match("{a/,}a/**", "a/a", flags::DEFAULT));
-        assert!(glob_match("{a/,}a/**", "a/a/a", flags::DEFAULT));
-        assert!(glob_match("{a/,}a/**", "a/a/", flags::DEFAULT));
-        assert!(glob_match("{a/,}a/**", "a/a/a/", flags::DEFAULT));
-        assert!(glob_match("{a/,}b/**", "a/b/a/", flags::DEFAULT));
-        assert!(glob_match("{a/,}b/**", "b/a/", flags::DEFAULT));
-        assert!(glob_match("a{,/}*.txt", "a.txt", flags::DEFAULT));
-        assert!(glob_match("a{,/}*.txt", "ab.txt", flags::DEFAULT));
-        assert!(glob_match("a{,/}*.txt", "a/b.txt", flags::DEFAULT));
-        assert!(glob_match("a{,/}*.txt", "a/ab.txt", flags::DEFAULT));
+        // assert!(glob_match("{a/,}a/**", "a", flags::ALL));
+        assert!(glob_match("a{a,b/}*.txt", "aa.txt", flags::ALL));
+        assert!(glob_match("a{a,b/}*.txt", "ab/.txt", flags::ALL));
+        assert!(glob_match("a{a,b/}*.txt", "ab/a.txt", flags::ALL));
+        // assert!(glob_match("{a/,}a/**", "a/", flags::ALL));
+        assert!(glob_match("{a/,}a/**", "a/a/", flags::ALL));
+        // assert!(glob_match("{a/,}a/**", "a/a", flags::ALL));
+        assert!(glob_match("{a/,}a/**", "a/a/a", flags::ALL));
+        assert!(glob_match("{a/,}a/**", "a/a/", flags::ALL));
+        assert!(glob_match("{a/,}a/**", "a/a/a/", flags::ALL));
+        assert!(glob_match("{a/,}b/**", "a/b/a/", flags::ALL));
+        assert!(glob_match("{a/,}b/**", "b/a/", flags::ALL));
+        assert!(glob_match("a{,/}*.txt", "a.txt", flags::ALL));
+        assert!(glob_match("a{,/}*.txt", "ab.txt", flags::ALL));
+        assert!(glob_match("a{,/}*.txt", "a/b.txt", flags::ALL));
+        assert!(glob_match("a{,/}*.txt", "a/ab.txt", flags::ALL));
 
         assert!(glob_match(
             "a{,.*{foo,db},\\(bar\\)}.txt",
             "a.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "a{,.*{foo,db},\\(bar\\)}.txt",
             "adb.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a{,.*{foo,db},\\(bar\\)}.txt",
             "a.db.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
 
         assert!(glob_match(
             "a{,*.{foo,db},\\(bar\\)}.txt",
             "a.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "a{,*.{foo,db},\\(bar\\)}.txt",
             "adb.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a{,*.{foo,db},\\(bar\\)}.txt",
             "a.db.txt",
-            flags::DEFAULT
+            flags::ALL
         ));
 
-        // assert!(glob_match("a{,.*{foo,db},\\(bar\\)}", "a", flags::DEFAULT));
-        assert!(!glob_match(
-            "a{,.*{foo,db},\\(bar\\)}",
-            "adb",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a{,.*{foo,db},\\(bar\\)}",
-            "a.db",
-            flags::DEFAULT
-        ));
+        // assert!(glob_match("a{,.*{foo,db},\\(bar\\)}", "a", flags::ALL));
+        assert!(!glob_match("a{,.*{foo,db},\\(bar\\)}", "adb", flags::ALL));
+        assert!(glob_match("a{,.*{foo,db},\\(bar\\)}", "a.db", flags::ALL));
 
-        // assert!(glob_match("a{,*.{foo,db},\\(bar\\)}", "a", flags::DEFAULT));
-        assert!(!glob_match(
-            "a{,*.{foo,db},\\(bar\\)}",
-            "adb",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a{,*.{foo,db},\\(bar\\)}",
-            "a.db",
-            flags::DEFAULT
-        ));
+        // assert!(glob_match("a{,*.{foo,db},\\(bar\\)}", "a", flags::ALL));
+        assert!(!glob_match("a{,*.{foo,db},\\(bar\\)}", "adb", flags::ALL));
+        assert!(glob_match("a{,*.{foo,db},\\(bar\\)}", "a.db", flags::ALL));
 
-        assert!(!glob_match("{,.*{foo,db},\\(bar\\)}", "a", flags::DEFAULT));
-        assert!(!glob_match(
-            "{,.*{foo,db},\\(bar\\)}",
-            "adb",
-            flags::DEFAULT
-        ));
-        assert!(!glob_match(
-            "{,.*{foo,db},\\(bar\\)}",
-            "a.db",
-            flags::DEFAULT
-        ));
-        assert!(glob_match("{,.*{foo,db},\\(bar\\)}", ".db", flags::DEFAULT));
+        assert!(!glob_match("{,.*{foo,db},\\(bar\\)}", "a", flags::ALL));
+        assert!(!glob_match("{,.*{foo,db},\\(bar\\)}", "adb", flags::ALL));
+        assert!(!glob_match("{,.*{foo,db},\\(bar\\)}", "a.db", flags::ALL));
+        assert!(glob_match("{,.*{foo,db},\\(bar\\)}", ".db", flags::ALL));
 
-        assert!(!glob_match("{,*.{foo,db},\\(bar\\)}", "a", flags::DEFAULT));
-        assert!(glob_match("{*,*.{foo,db},\\(bar\\)}", "a", flags::DEFAULT));
-        assert!(!glob_match(
-            "{,*.{foo,db},\\(bar\\)}",
-            "adb",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "{,*.{foo,db},\\(bar\\)}",
-            "a.db",
-            flags::DEFAULT
-        ));
+        assert!(!glob_match("{,*.{foo,db},\\(bar\\)}", "a", flags::ALL));
+        assert!(glob_match("{*,*.{foo,db},\\(bar\\)}", "a", flags::ALL));
+        assert!(!glob_match("{,*.{foo,db},\\(bar\\)}", "adb", flags::ALL));
+        assert!(glob_match("{,*.{foo,db},\\(bar\\)}", "a.db", flags::ALL));
 
         assert!(!glob_match(
             "a/b/**/c{d,e}/**/xyz.md",
             "a/b/c/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(!glob_match(
             "a/b/**/c{d,e}/**/xyz.md",
             "a/b/d/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/b/**/c{d,e}/**/xyz.md",
             "a/b/cd/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/b/**/{c,d,e}/**/xyz.md",
             "a/b/c/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/b/**/{c,d,e}/**/xyz.md",
             "a/b/d/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/b/**/{c,d,e}/**/xyz.md",
             "a/b/e/xyz.md",
-            flags::DEFAULT
+            flags::ALL
         ));
 
-        assert!(glob_match("*{a,b}*", "xax", flags::DEFAULT));
-        assert!(glob_match("*{a,b}*", "xxax", flags::DEFAULT));
-        assert!(glob_match("*{a,b}*", "xbx", flags::DEFAULT));
+        assert!(glob_match("*{a,b}*", "xax", flags::ALL));
+        assert!(glob_match("*{a,b}*", "xxax", flags::ALL));
+        assert!(glob_match("*{a,b}*", "xbx", flags::ALL));
 
-        assert!(glob_match("*{*a,b}", "xba", flags::DEFAULT));
-        assert!(glob_match("*{*a,b}", "xb", flags::DEFAULT));
+        assert!(glob_match("*{*a,b}", "xba", flags::ALL));
+        assert!(glob_match("*{*a,b}", "xb", flags::ALL));
 
-        assert!(!glob_match("*??", "a", flags::DEFAULT));
-        assert!(!glob_match("*???", "aa", flags::DEFAULT));
-        assert!(glob_match("*???", "aaa", flags::DEFAULT));
-        assert!(!glob_match("*****??", "a", flags::DEFAULT));
-        assert!(!glob_match("*****???", "aa", flags::DEFAULT));
-        assert!(glob_match("*****???", "aaa", flags::DEFAULT));
+        assert!(!glob_match("*??", "a", flags::ALL));
+        assert!(!glob_match("*???", "aa", flags::ALL));
+        assert!(glob_match("*???", "aaa", flags::ALL));
+        assert!(!glob_match("*****??", "a", flags::ALL));
+        assert!(!glob_match("*****???", "aa", flags::ALL));
+        assert!(glob_match("*****???", "aaa", flags::ALL));
 
-        assert!(!glob_match("a*?c", "aaa", flags::DEFAULT));
-        assert!(glob_match("a*?c", "aac", flags::DEFAULT));
-        assert!(glob_match("a*?c", "abc", flags::DEFAULT));
+        assert!(!glob_match("a*?c", "aaa", flags::ALL));
+        assert!(glob_match("a*?c", "aac", flags::ALL));
+        assert!(glob_match("a*?c", "abc", flags::ALL));
 
-        assert!(glob_match("a**?c", "abc", flags::DEFAULT));
-        assert!(!glob_match("a**?c", "abb", flags::DEFAULT));
-        assert!(glob_match("a**?c", "acc", flags::DEFAULT));
-        assert!(glob_match("a*****?c", "abc", flags::DEFAULT));
+        assert!(glob_match("a**?c", "abc", flags::ALL));
+        assert!(!glob_match("a**?c", "abb", flags::ALL));
+        assert!(glob_match("a**?c", "acc", flags::ALL));
+        assert!(glob_match("a*****?c", "abc", flags::ALL));
 
-        assert!(glob_match("*****?", "a", flags::DEFAULT));
-        assert!(glob_match("*****?", "aa", flags::DEFAULT));
-        assert!(glob_match("*****?", "abc", flags::DEFAULT));
-        assert!(glob_match("*****?", "zzz", flags::DEFAULT));
-        assert!(glob_match("*****?", "bbb", flags::DEFAULT));
-        assert!(glob_match("*****?", "aaaa", flags::DEFAULT));
+        assert!(glob_match("*****?", "a", flags::ALL));
+        assert!(glob_match("*****?", "aa", flags::ALL));
+        assert!(glob_match("*****?", "abc", flags::ALL));
+        assert!(glob_match("*****?", "zzz", flags::ALL));
+        assert!(glob_match("*****?", "bbb", flags::ALL));
+        assert!(glob_match("*****?", "aaaa", flags::ALL));
 
-        assert!(!glob_match("*****??", "a", flags::DEFAULT));
-        assert!(glob_match("*****??", "aa", flags::DEFAULT));
-        assert!(glob_match("*****??", "abc", flags::DEFAULT));
-        assert!(glob_match("*****??", "zzz", flags::DEFAULT));
-        assert!(glob_match("*****??", "bbb", flags::DEFAULT));
-        assert!(glob_match("*****??", "aaaa", flags::DEFAULT));
+        assert!(!glob_match("*****??", "a", flags::ALL));
+        assert!(glob_match("*****??", "aa", flags::ALL));
+        assert!(glob_match("*****??", "abc", flags::ALL));
+        assert!(glob_match("*****??", "zzz", flags::ALL));
+        assert!(glob_match("*****??", "bbb", flags::ALL));
+        assert!(glob_match("*****??", "aaaa", flags::ALL));
 
-        assert!(!glob_match("?*****??", "a", flags::DEFAULT));
-        assert!(!glob_match("?*****??", "aa", flags::DEFAULT));
-        assert!(glob_match("?*****??", "abc", flags::DEFAULT));
-        assert!(glob_match("?*****??", "zzz", flags::DEFAULT));
-        assert!(glob_match("?*****??", "bbb", flags::DEFAULT));
-        assert!(glob_match("?*****??", "aaaa", flags::DEFAULT));
+        assert!(!glob_match("?*****??", "a", flags::ALL));
+        assert!(!glob_match("?*****??", "aa", flags::ALL));
+        assert!(glob_match("?*****??", "abc", flags::ALL));
+        assert!(glob_match("?*****??", "zzz", flags::ALL));
+        assert!(glob_match("?*****??", "bbb", flags::ALL));
+        assert!(glob_match("?*****??", "aaaa", flags::ALL));
 
-        assert!(glob_match("?*****?c", "abc", flags::DEFAULT));
-        assert!(!glob_match("?*****?c", "abb", flags::DEFAULT));
-        assert!(!glob_match("?*****?c", "zzz", flags::DEFAULT));
+        assert!(glob_match("?*****?c", "abc", flags::ALL));
+        assert!(!glob_match("?*****?c", "abb", flags::ALL));
+        assert!(!glob_match("?*****?c", "zzz", flags::ALL));
 
-        assert!(glob_match("?***?****c", "abc", flags::DEFAULT));
-        assert!(!glob_match("?***?****c", "bbb", flags::DEFAULT));
-        assert!(!glob_match("?***?****c", "zzz", flags::DEFAULT));
+        assert!(glob_match("?***?****c", "abc", flags::ALL));
+        assert!(!glob_match("?***?****c", "bbb", flags::ALL));
+        assert!(!glob_match("?***?****c", "zzz", flags::ALL));
 
-        assert!(glob_match("?***?****?", "abc", flags::DEFAULT));
-        assert!(glob_match("?***?****?", "bbb", flags::DEFAULT));
-        assert!(glob_match("?***?****?", "zzz", flags::DEFAULT));
+        assert!(glob_match("?***?****?", "abc", flags::ALL));
+        assert!(glob_match("?***?****?", "bbb", flags::ALL));
+        assert!(glob_match("?***?****?", "zzz", flags::ALL));
 
-        assert!(glob_match("?***?****", "abc", flags::DEFAULT));
-        assert!(glob_match("*******c", "abc", flags::DEFAULT));
-        assert!(glob_match("*******?", "abc", flags::DEFAULT));
-        assert!(glob_match("a*cd**?**??k", "abcdecdhjk", flags::DEFAULT));
-        assert!(glob_match("a**?**cd**?**??k", "abcdecdhjk", flags::DEFAULT));
-        assert!(glob_match(
-            "a**?**cd**?**??k***",
-            "abcdecdhjk",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a**?**cd**?**??***k",
-            "abcdecdhjk",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("?***?****", "abc", flags::ALL));
+        assert!(glob_match("*******c", "abc", flags::ALL));
+        assert!(glob_match("*******?", "abc", flags::ALL));
+        assert!(glob_match("a*cd**?**??k", "abcdecdhjk", flags::ALL));
+        assert!(glob_match("a**?**cd**?**??k", "abcdecdhjk", flags::ALL));
+        assert!(glob_match("a**?**cd**?**??k***", "abcdecdhjk", flags::ALL));
+        assert!(glob_match("a**?**cd**?**??***k", "abcdecdhjk", flags::ALL));
         assert!(glob_match(
             "a**?**cd**?**??***k**",
             "abcdecdhjk",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(glob_match(
-            "a****c**?**??*****",
-            "abcdecdhjk",
-            flags::DEFAULT
-        ));
+        assert!(glob_match("a****c**?**??*****", "abcdecdhjk", flags::ALL));
 
-        assert!(!glob_match(
-            "a/?/c/?/*/e.md",
-            "a/b/c/d/e.md",
-            flags::DEFAULT
-        ));
-        assert!(glob_match(
-            "a/?/c/?/*/e.md",
-            "a/b/c/d/e/e.md",
-            flags::DEFAULT
-        ));
+        assert!(!glob_match("a/?/c/?/*/e.md", "a/b/c/d/e.md", flags::ALL));
+        assert!(glob_match("a/?/c/?/*/e.md", "a/b/c/d/e/e.md", flags::ALL));
         assert!(glob_match(
             "a/?/c/?/*/e.md",
             "a/b/c/d/efghijk/e.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/?/**/e.md",
             "a/b/c/d/efghijk/e.md",
-            flags::DEFAULT
+            flags::ALL
         ));
-        assert!(!glob_match("a/?/e.md", "a/bb/e.md", flags::DEFAULT));
-        assert!(glob_match("a/??/e.md", "a/bb/e.md", flags::DEFAULT));
-        assert!(!glob_match("a/?/**/e.md", "a/bb/e.md", flags::DEFAULT));
-        assert!(glob_match("a/?/**/e.md", "a/b/ccc/e.md", flags::DEFAULT));
+        assert!(!glob_match("a/?/e.md", "a/bb/e.md", flags::ALL));
+        assert!(glob_match("a/??/e.md", "a/bb/e.md", flags::ALL));
+        assert!(!glob_match("a/?/**/e.md", "a/bb/e.md", flags::ALL));
+        assert!(glob_match("a/?/**/e.md", "a/b/ccc/e.md", flags::ALL));
         assert!(glob_match(
             "a/*/?/**/e.md",
             "a/b/c/d/efghijk/e.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/*/?/**/e.md",
             "a/b/c/d/efgh.ijk/e.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/*/?/**/e.md",
             "a/b.bb/c/d/efgh.ijk/e.md",
-            flags::DEFAULT
+            flags::ALL
         ));
         assert!(glob_match(
             "a/*/?/**/e.md",
             "a/bbb/c/d/efgh.ijk/e.md",
-            flags::DEFAULT
+            flags::ALL
         ));
 
-        assert!(glob_match("a/*/ab??.md", "a/bbb/abcd.md", flags::DEFAULT));
-        assert!(glob_match("a/bbb/ab??.md", "a/bbb/abcd.md", flags::DEFAULT));
-        assert!(glob_match("a/bbb/ab???md", "a/bbb/abcd.md", flags::DEFAULT));
+        assert!(glob_match("a/*/ab??.md", "a/bbb/abcd.md", flags::ALL));
+        assert!(glob_match("a/bbb/ab??.md", "a/bbb/abcd.md", flags::ALL));
+        assert!(glob_match("a/bbb/ab???md", "a/bbb/abcd.md", flags::ALL));
     }
 
     #[test]
@@ -2624,11 +2475,11 @@ mod tests {
     fn fuzz_tests() {
         // https://github.com/devongovett/glob-match/issues/1
         let s = "{*{??*{??**,Uz*zz}w**{*{**a,z***b*[!}w??*azzzzzzzz*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!z[za,z&zz}w**z*z*}";
-        assert!(!glob_match(s, s, flags::DEFAULT));
+        assert!(!glob_match(s, s, flags::ALL));
         let s = "**** *{*{??*{??***\u{5} *{*{??*{??***\u{5},\0U\0}]*****\u{1},\0***\0,\0\0}w****,\0U\0}]*****\u{1},\0***\0,\0\0}w*****\u{1}***{}*.*\0\0*\0";
-        assert!(!glob_match(s, s, flags::DEFAULT));
+        assert!(!glob_match(s, s, flags::ALL));
 
         // Stale globstar backtrack across brace alternatives caused infinite loop.
-        assert!(!glob_match("{/**/0,*", "/1", flags::DEFAULT));
+        assert!(!glob_match("{/**/0,*", "/1", flags::ALL));
     }
 }

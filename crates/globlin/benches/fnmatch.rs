@@ -10,7 +10,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             globlin::glob_match(
                 black_box("foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}/foo/**/{*a,*b}"),
                 black_box("foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a/foo/b/c/d/a"),
-                globlin::flags::DEFAULT,
+                globlin::flags::ALL,
             )
         })
     });
