@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "serena": {
+      "type": "stdio",
+      "command": "nix",
+      "args": [
+        "run",
+        "github:oraios/serena",
+        "--",
+        "start-mcp-server",
+        "--context",
+        "claude-code",
+        "--project-from-cwd"
+      ],
+      "env": {
+        "ENABLE_TOOL_SEARCH": "true"
+      }
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "env": {}
+    }
+  }
+}
