@@ -1,5 +1,5 @@
 # noqa: D104
-# SPDX-FileCopyrightText: 2025 László Vaskó <opensource@vlaci.email.com>
+# SPDX-FileCopyrightText: 2025 László Vaskó <opensource@accounts.vlaci.email>
 #
 # SPDX-License-Identifier: EUPL-1.2
 
