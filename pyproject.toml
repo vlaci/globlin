@@ -18,11 +18,12 @@ dynamic = ["version"]
 [project.urls]
 Homepage = "https://vlaci.github.io/globlin"
 Repository = "https://github.com/vlaci/globlin"
-Changelog = "https://github.com/vlaci/globlin/blob/main/CHANGELOG.md"
+Changelog = "https://vlaci.github.io/globlin/changelog/"
 
 [dependency-groups]
 dev = ["maturin-import-hook==0.3.0", "ruff==0.14.4"]
-test = ["pytest==9.0.1"]
+test = ["pytest==9.0.1", "sybil>=9"]
+docs = ["zensical", "mkdocstrings-python", "griffe-warnings-deprecated"]
 
 [build-system]
 requires = ["maturin>=1.9,<2.0"]
@@ -89,6 +90,11 @@ convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["globlin"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+  "ignore:passing Flag arguments to fnmatch is deprecated:DeprecationWarning",
+]
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = false

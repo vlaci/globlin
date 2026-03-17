@@ -1,0 +1,11 @@
+<svg width="260" height="280" viewBox="0 0 220 280" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .logo-fg { fill: #1a1a1a; }
+    @media (prefers-color-scheme: dark) {
+      .logo-fg { fill: #ffffff; }
+    }
+  </style>
+  <text class="logo-fg" x="10" y="210" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="280" font-weight="400" text-anchor="middle">[</text>
+  <text class="logo-fg" x="110" y="260" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="280" font-weight="600" text-anchor="middle">*</text>
+  <text class="logo-fg" x="210" y="210" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="280" font-weight="400" text-anchor="middle">]</text>
+</svg>

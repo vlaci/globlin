@@ -78,6 +78,8 @@ Flags are a `u8` bitfield in `globlin::flags`. `DEFAULT` includes only POSIX fnm
 | `ruff format .` | Format Python |
 | `pyright` | Type-check Python (strict mode) |
 | `prek run --all-files` | Run all pre-commit checks |
+| `zensical serve` | Preview documentation site locally |
+| `zensical build` | Build documentation site to `site/` |
 
 ## Testing Conventions
 
@@ -89,7 +91,7 @@ Flags are a `u8` bitfield in `globlin::flags`. `DEFAULT` includes only POSIX fnm
 - **Scoped prefix** for changes within a single area: `scope: lowercase message` — e.g. `ci: export pytest coverage data`, `glob: add configuration flags`
 - **No prefix** for cross-cutting or top-level changes
 - Lowercase message after the colon
-- Scopes used: `glob` (core crate), `ci` (GitHub Actions / CI)
+- Scopes used: `glob` (core crate), `ci` (GitHub Actions / CI), `docs` (documentation)
 
 ## Workflow
 
