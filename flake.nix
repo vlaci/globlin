@@ -99,6 +99,7 @@
           pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
             (_python-final: _python-prev: {
               globlin = cmLib.buildMaturinPackage {
+                pname = "globlin";
                 src = final.lib.cleanSourceWith {
                   src = cmLib.path ./.;
                   filter = sourceFilter;
