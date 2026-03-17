@@ -27,3 +27,6 @@ perf.data
 perf.data.old
 fuzz-*.log
 result
+
+# Documentation build output
+/site

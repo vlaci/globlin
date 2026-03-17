@@ -189,7 +189,8 @@ mod globlin {
             PyErr::warn(
                 py,
                 &py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
-                c"passing Flag arguments to fnmatch is deprecated, use Glob.default() instead",
+                c"passing Flag arguments to fnmatch is deprecated, use Glob class instead.\n\
+                See: https://vlaci.github.io/globlin/migration/#migrating-from-v02",
                 1,
             )?;
             // Start with PATH_SEPARATOR set to preserve old behavior where

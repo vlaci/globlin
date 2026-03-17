@@ -93,11 +93,12 @@
           assetFilter =
             path: _type: builtins.match ".*pyi?$|.*/py\.typed$|.*/README.md$|.*/LICENSE$" path != null;
           sourceFilter = path: type: (assetFilter path type) || (cmLib.filterCargoSources path type);
-          testFilter = p: _t: builtins.match ".*/(pyproject\.toml|tests|tests/.*\.py)$" p != null;
+          testFilter =
+            p: _t: builtins.match ".*/(pyproject\.toml|tests|tests/.*\.py|docs|docs/.*\.md)$" p != null;
         in
         {
           pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-            (_python-final: _python-prev: {
+            (python-final: _python-prev: {
               globlin = cmLib.buildMaturinPackage {
                 pname = "globlin";
                 src = final.lib.cleanSourceWith {
@@ -109,6 +110,9 @@
                   filter = p: t: (sourceFilter p t) || (testFilter p t);
                 };
                 inherit advisory-db;
+                pytestCheckInputs = [
+                  python-final.sybil
+                ];
               };
             })
           ];
@@ -165,6 +169,8 @@
             uvExtraArgs = [
               "--group"
               "test"
+              "--group"
+              "docs"
             ];
           };
         }

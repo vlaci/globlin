@@ -2,7 +2,7 @@
 
 SPDX-License-Identifier: EUPL-1.2 -->
 
-# globlin
+# <img src="docs/images/logo.svg" alt="" height="28"> globlin
 
 A fast, Rust-backed glob pattern matching library for Python. Drop-in
 alternative to the standard library's `fnmatch` with additional features
