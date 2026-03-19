@@ -76,17 +76,16 @@ jobs:
     strategy:
       matrix:
         platform:
-          - runner: ubuntu-22.04
+          - runner: ubuntu-24.04
             target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
-          - runner: ubuntu-22.04
+          - runner: ubuntu-24.04-arm
             target: aarch64
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: 3.x
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Set up Python
+        run: uv python install
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -114,30 +113,13 @@ jobs:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
       - name: pytest
-        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
         shell: bash
         run: |
           set -e
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install globlin --find-links dist --force-reinstall
-          pip install pytest
-          pytest
-      - name: pytest
-        if: ${{ !startsWith(matrix.platform.target, 'x86') }}
-        uses: uraimo/run-on-arch-action@v3
-        with:
-          arch: ${{ matrix.platform.target }}
-          distro: ubuntu22.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip pytest
-          run: |
-            set -e
-            pip3 install globlin --find-links dist --force-reinstall
-            pytest
+          uv venv --clear
+          uv sync --no-install-project --no-default-groups --group test
+          uv pip install globlin --no-index --find-links dist
+          .venv/bin/pytest
 
   musllinux:
     needs: [Nix]
@@ -145,11 +127,9 @@ jobs:
     strategy:
       matrix:
         platform:
-          - runner: ubuntu-22.04
+          - runner: ubuntu-24.04
             target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
-          - runner: ubuntu-22.04
+          - runner: ubuntu-24.04-arm
             target: aarch64
     steps:
       - uses: actions/checkout@v5
@@ -183,35 +163,19 @@ jobs:
           name: wheels-musllinux-${{ matrix.platform.target }}
           path: dist
       - name: pytest
-        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
         uses: addnab/docker-run-action@v3
         with:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
           run: |
             set -e
-            apk add py3-pip py3-virtualenv
-            python3 -m virtualenv .venv
-            source .venv/bin/activate
-            pip install globlin --no-index --find-links dist --force-reinstall
-            pip install pytest
-            pytest
-      - name: pytest
-        if: ${{ !startsWith(matrix.platform.target, 'x86') }}
-        uses: uraimo/run-on-arch-action@v3
-        with:
-          arch: ${{ matrix.platform.target }}
-          distro: alpine_latest
-          githubToken: ${{ github.token }}
-          install: |
-            apk add py3-virtualenv
-          run: |
-            set -e
-            python3 -m virtualenv .venv
-            source .venv/bin/activate
-            pip install pytest
-            pip install globlin --find-links dist --force-reinstall
-            pytest
+            apk add curl python3
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            uv venv
+            uv sync --no-install-project --no-default-groups --group test
+            uv pip install globlin --no-index --find-links dist
+            .venv/bin/pytest
 
   windows:
     needs: [Nix]
@@ -221,14 +185,14 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
-          - runner: windows-latest
-            target: x86
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
           architecture: ${{ matrix.platform.target }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -265,11 +229,10 @@ jobs:
         shell: bash
         run: |
           set -e
-          python3 -m venv .venv
-          source .venv/Scripts/activate
-          pip install globlin --find-links dist --force-reinstall
-          pip install pytest
-          pytest
+          uv venv --clear
+          uv sync --no-install-project --no-default-groups --group test
+          uv pip install globlin --no-index --find-links dist
+          .venv/Scripts/pytest
 
   macos:
     needs: [Nix]
@@ -286,6 +249,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -312,11 +277,10 @@ jobs:
       - name: pytest
         run: |
           set -e
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install globlin --find-links dist --force-reinstall
-          pip install pytest
-          pytest
+          uv venv --clear
+          uv sync --no-install-project --no-default-groups --group test
+          uv pip install globlin --no-index --find-links dist
+          .venv/bin/pytest
 
   sdist:
     needs: [Nix]
