@@ -63,7 +63,6 @@ def test_not_matching_patterns(pattern: str, value: str):
         pytest.param("a?path", "a/path", Flag.NO_PATH, id="no-path-question-mark"),
     ],
 )
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_matching_pattern_with_flags(pattern: str, value: str, flag: Flag):
     assert fnmatch(pattern, value, flag)
 
@@ -85,12 +84,10 @@ def test_matching_pattern_with_flags(pattern: str, value: str, flag: Flag):
         pytest.param("a?path", "a/path", Flag.EMPTY, id="path-question-mark"),
     ],
 )
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_not_matching_pattern_with_flags(pattern: str, value: str, flag: Flag):
     assert not fnmatch(pattern, value, flag)
 
 
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_invalid_flags():
     with pytest.raises(TypeError):
         fnmatch("foo", "bar", "not a flag")  # type: ignore
