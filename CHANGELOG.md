@@ -13,7 +13,12 @@ All notable changes to this project are documented in this file.
 - `Glob` builder API — composable, immutable configuration replacing the
   deprecated `Flag` enum and `fnmatch()` function
 - Documentation site (zensical)
-- Benchmarking infrastructure (criterion + divan)
+
+## [0.2.1] — 2026-03-01
+
+### Added
+
+- Benchmarking infrastructure
 - Workspace split: Python binding is now a separate crate (`crates/python_binding`)
 
 ### Fixed
@@ -47,7 +52,8 @@ All notable changes to this project are documented in this file.
 
 Initial release as `better-fnmatch`.
 
-[Unreleased]: https://github.com/vlaci/globlin/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/vlaci/globlin/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/vlaci/globlin/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/vlaci/globlin/compare/v0.1.1-globlin...v0.2.0
 [0.1.1-globlin]: https://github.com/vlaci/globlin/compare/v0.1.1...v0.1.1-globlin
 [0.1.1]: https://github.com/vlaci/globlin/compare/v0.1.0...v0.1.1

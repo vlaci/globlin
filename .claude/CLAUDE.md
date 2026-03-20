@@ -17,7 +17,7 @@ A Rust glob pattern matching library with Python bindings (via PyO3/maturin). Pr
 crates/
   globlin/          # Core Rust library (zero runtime deps)
     src/lib.rs      # Single-file implementation (~2600 lines, all logic + tests)
-    benches/        # criterion (fnmatch.rs) and divan (glob_match.rs) benchmarks
+    benches/        # criterion benchmarks (fnmatch.rs)
   python_binding/   # PyO3 cdylib wrapping globlin for Python
 python/globlin/     # Python package (type stubs, __init__.py, py.typed)
 tests/              # Python pytest suite
