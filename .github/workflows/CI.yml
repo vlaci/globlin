@@ -29,16 +29,14 @@ jobs:
             arch: x86_64-linux
           - os: ubuntu-24.04-arm
             arch: aarch64-linux
-          - os: macos-26-intel
-            arch: x86_64-darwin
           - os: macos-26
             arch: aarch64-darwin
     name: Build Nix - ${{ matrix.arch }}.${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
-      - uses: cachix/cachix-action@v16
+      - uses: cachix/cachix-action@v17
         with:
           name: vlaci
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -57,13 +55,13 @@ jobs:
         run: |
           nix build .#checks.${{ matrix.arch }}.test-coverage -o cargo-test
           nix build .#checks.${{ matrix.arch }}.pytest-coverage -o pytest
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         if: ${{ matrix.arch == 'x86_64-linux' }}
         with:
           flags: cargo-test
           files: cargo-test/coverage.codecov
           token: ${{ secrets.CODECOV_TOKEN }}
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         if: ${{ matrix.arch == 'x86_64-linux' }}
         with:
           flags: pytest
@@ -81,9 +79,9 @@ jobs:
           - runner: ubuntu-24.04-arm
             target: aarch64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.2.0
       - name: Set up Python
         run: uv python install
       - name: Build wheels
@@ -91,13 +89,6 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-lto --out dist --zig
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: auto
-      - name: Build free-threaded wheels (3.13)
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --profile release-lto --out dist --zig -i python3.13t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
       - name: Build free-threaded wheels (3.14)
@@ -108,7 +99,7 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
@@ -132,8 +123,8 @@ jobs:
           - runner: ubuntu-24.04-arm
             target: aarch64
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.x
       - name: Build wheels
@@ -141,13 +132,6 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-lto --out dist
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: musllinux_1_2
-      - name: Build free-threaded wheels (3.13)
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --profile release-lto --out dist -i python3.13t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: musllinux_1_2
       - name: Build free-threaded wheels (3.14)
@@ -158,7 +142,7 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: musllinux_1_2
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-musllinux-${{ matrix.platform.target }}
           path: dist
@@ -186,30 +170,20 @@ jobs:
           - runner: windows-latest
             target: x64
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.x
           architecture: ${{ matrix.platform.target }}
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.2.0
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-lto --out dist
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - uses: actions/setup-python@v6
-        with:
-          python-version: 3.13t
-          architecture: ${{ matrix.platform.target }}
-      - name: Build free-threaded wheels (3.13)
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --profile release-lto --out dist -i python3.13t
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.14t
           architecture: ${{ matrix.platform.target }}
@@ -220,7 +194,7 @@ jobs:
           args: --profile release-lto --out dist -i python3.14t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
@@ -245,32 +219,26 @@ jobs:
           - runner: macos-26
             target: aarch64
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.x
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.2.0
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-lto --out dist
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - name: Build free-threaded wheels (3.13)
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --profile release-lto --out dist -i python3.13t
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - name: Build free-threaded wheels (3.13)
+      - name: Build free-threaded wheels (3.14)
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-lto --out dist -i python3.14t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-macos-${{ matrix.platform.target }}
           path: dist
@@ -286,14 +254,14 @@ jobs:
     needs: [Nix]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist
       - name: Upload sdist
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-sdist
           path: dist
@@ -310,15 +278,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/configure-pages@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
       - run: uv sync --only-group docs
       - run: uv run zensical build --clean
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment
 
   release:
@@ -335,9 +303,9 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: "wheels-*/*"
       - name: Publish to PyPI
