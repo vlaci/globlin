@@ -4,8 +4,9 @@
 # SPDX-License-Identifier: EUPL-1.2
 
 import enum
+from typing import Self
 
-from typing_extensions import Self, deprecated
+from typing_extensions import deprecated
 
 class Glob:
     """Glob pattern matcher with configurable features.

@@ -4,7 +4,7 @@
 
 [project]
 name = "globlin"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
   "Programming Language :: Rust",
   "Programming Language :: Python :: Implementation :: CPython",
@@ -30,7 +30,7 @@ requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
-features = ["pyo3/extension-module", "pyo3/abi3-py39"]
+features = ["pyo3/extension-module", "pyo3/abi3-py311"]
 manifest-path = "crates/python_binding/Cargo.toml"
 python-source = "python"
 
@@ -78,8 +78,6 @@ ignore = [
   "D213",   # multi-line-summary-second-line: D212 (multi-line-summary-first-line) is used instead
   "E501",   # line-too-long:                  Let black handle line length violations
   "PYI021", # docstring-in-stub:              We document in the stub
-  "UP006",  # non-pep585-annotation:          For Python 3.8 compatibility
-  "UP007",  # non-pep604-annotation:          For Python 3.8 compatibility
 ]
 
 [tool.ruff.lint.per-file-ignores]
