@@ -18,7 +18,7 @@ version = "0.2.1"
 [workspace.dependencies]
 globlin = { path = "crates/globlin" }
 
-pyo3 = "0.28.2"
+pyo3 = "0.29.3"
 
 criterion = { version = "0.8.0", features = ["html_reports"] }
 

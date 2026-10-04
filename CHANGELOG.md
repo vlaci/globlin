@@ -14,6 +14,10 @@ All notable changes to this project are documented in this file.
   deprecated `Flag` enum and `fnmatch()` function
 - Documentation site (zensical)
 
+### Removed
+
+- Free-threaded Python 3.13 (`3.13t`) wheels. `3.14t` wheels are still available
+
 ## [0.2.1] — 2026-03-01
 
 ### Added

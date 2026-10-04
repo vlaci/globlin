@@ -13,7 +13,7 @@ SPDX-License-Identifier: EUPL-1.2
 !!! warning "Unreleased"
     This documentation covers the upcoming v0.3 API. For the current stable
     release (v0.2), see the "v0.2 usage" sections and the
-    [API reference](api-reference.md#globlin.globlin.fnmatch).
+    [API reference](api-reference.md#globlin.fnmatch).
 
 A fast glob pattern matching library for Python. Replaces the standard
 library's [`fnmatch`][fnmatch] with a configurable matcher that supports

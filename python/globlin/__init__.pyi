@@ -297,6 +297,7 @@ class Flags(enum.IntFlag):
 @deprecated("Use Glob.default() instead")
 def fnmatch(pattern: str, value: str, *flags: Flag) -> bool:
     """Match a glob pattern against a value."""
+
 @deprecated("Use Glob instead")
 class Flag:
     """Flag enum for fnmatch."""
