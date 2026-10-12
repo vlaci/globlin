@@ -21,7 +21,7 @@ Repository = "https://github.com/vlaci/globlin"
 Changelog = "https://vlaci.github.io/globlin/changelog/"
 
 [dependency-groups]
-dev = ["maturin-import-hook==0.3.0", "ruff==0.16.10"]
+dev = ["maturin-import-hook==0.3.0", "ruff==0.17.0"]
 test = ["pytest==9.1.1", "sybil>=9"]
 docs = ["zensical", "mkdocstrings-python", "griffe-warnings-deprecated"]
 
