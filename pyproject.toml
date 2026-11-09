@@ -22,7 +22,7 @@ Changelog = "https://vlaci.github.io/globlin/changelog/"
 
 [dependency-groups]
 dev = ["maturin-import-hook==0.3.0", "ruff==0.17.4"]
-test = ["pytest==9.1.1", "sybil>=9"]
+test = ["pytest==9.2.0", "sybil>=9"]
 docs = ["zensical", "mkdocstrings-python", "griffe-warnings-deprecated"]
 
 [build-system]
